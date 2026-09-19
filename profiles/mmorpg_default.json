@@ -236,8 +236,8 @@
       }
     },
     "DPAD_RIGHT": {
-      "mode": "press",
-      "press": {
+      "mode": "short_long",
+      "short": {
         "type": "radial",
         "radial_items": [
           {
@@ -280,8 +280,11 @@
           }
         ]
       },
-      "release": {
-        "type": "none"
+      "long": {
+        "type": "keys",
+        "keys": [
+          "x"
+        ]
       }
     },
     "VIEW": {
@@ -565,7 +568,11 @@
           "id": ""
         }
       ]
-    }
+    },
+    "current_buttons_enabled": true,
+    "current_buttons_movable": true,
+    "current_buttons_x": 919,
+    "current_buttons_y": 857
   },
   "context_layers": {
     "map_open": {

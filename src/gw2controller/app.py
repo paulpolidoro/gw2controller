@@ -13,6 +13,7 @@ from gw2controller.hotkeys import GlobalHotkeys, user32, vk_from_name
 from gw2controller.mapping.engine import InputEvent, MappingEngine
 from gw2controller.mapping.profiles import load_or_create_default, save_profile
 from gw2controller.output.sendinput import InputSender
+from gw2controller.overlay.current_buttons import CurrentButtonsOverlay
 from gw2controller.overlay.glyphs import app_icon_pixmap
 from gw2controller.overlay.radial import RadialOverlay
 from gw2controller.overlay.window import OverlayWindow
@@ -40,6 +41,7 @@ class GW2ControllerApp:
         self.sender = InputSender()
         self.overlay = OverlayWindow()
         self.radial = RadialOverlay()
+        self.current_buttons = CurrentButtonsOverlay()
         self.window = MainWindow(self.profile, self.profile_path)
         self.tray = TrayIcon(self.window)
 
@@ -58,6 +60,7 @@ class GW2ControllerApp:
         self.window.overlay_add_slot.connect(self.overlay.add_slot)
         self.window.overlay_layout_selected.connect(self.overlay.set_layout_key)
         self.overlay.slots_changed.connect(self._on_overlay_slots_changed)
+        self.current_buttons.moved.connect(self._on_current_buttons_moved)
         self.tray.edit_action.triggered.connect(self.toggle_edit_mode)
         self.tray.hide_overlay_action.triggered.connect(self.toggle_overlay_visible)
         self.app.aboutToQuit.connect(self.shutdown)
@@ -70,6 +73,7 @@ class GW2ControllerApp:
             )
 
         self.overlay.set_profile(self.profile)
+        self._apply_current_buttons_config()
         self.window.show()
         self.app.screenAdded.connect(self.window._refresh_screen_choices)
         self.app.screenRemoved.connect(self.window._refresh_screen_choices)
@@ -114,7 +118,24 @@ class GW2ControllerApp:
         self._dispatch(events)
         self.reader.trigger_threshold = self.profile.trigger_threshold
         self.overlay.set_profile(self.profile)
+        self._apply_current_buttons_config()
         self._register_hotkeys()
+
+    def _apply_current_buttons_config(self) -> None:
+        overlay = self.profile.overlay
+        self.current_buttons.set_config(
+            enabled=overlay.current_buttons_enabled,
+            movable=overlay.current_buttons_movable,
+            x=overlay.current_buttons_x,
+            y=overlay.current_buttons_y,
+            screen_index=overlay.screen_index,
+            theme=overlay.theme,
+        )
+
+    def _on_current_buttons_moved(self, x: int, y: int) -> None:
+        self.profile.overlay.current_buttons_x = int(x)
+        self.profile.overlay.current_buttons_y = int(y)
+        self._overlay_save_timer.start()
 
     def _sync_path(self) -> None:
         self.profile_path = self.window.profile_path
@@ -180,6 +201,8 @@ class GW2ControllerApp:
             self.profile.overlay.theme,
             self.profile.overlay.radial_alpha,
         )
+        if self.profile.overlay.current_buttons_enabled:
+            self.current_buttons.set_frames(result.pressed_frames)
         self._last_layer = result.runtime_label
         self.window.set_pad_state(pad, result.runtime_label, result.mumble)
 

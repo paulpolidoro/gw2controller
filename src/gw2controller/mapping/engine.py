@@ -26,6 +26,13 @@ class RadialView:
 
 
 @dataclass
+class PressedFrame:
+    label: str
+    progress: float = 0.0
+    long_pending: bool = False
+
+
+@dataclass
 class TickResult:
     runtime_label: str
     captions: dict[str, str]
@@ -37,6 +44,7 @@ class TickResult:
     radial: RadialView = field(default_factory=RadialView)
     mumble: MumbleState = field(default_factory=MumbleState)
     layout_key: str = "default"
+    pressed_frames: list[PressedFrame] = field(default_factory=list)
 
 
 def apply_radial_deadzone(x: float, y: float, deadzone: float) -> tuple[float, float]:
@@ -119,6 +127,7 @@ class MappingEngine:
                 release_all=True,
                 mumble=self._mumble,
                 layout_key=self._layout_key(),
+                pressed_frames=[PressedFrame("-")],
             )
         self._was_connected = pad.connected
         if not pad.connected:
@@ -131,6 +140,7 @@ class MappingEngine:
                 pad,
                 mumble=self._mumble,
                 layout_key=self._layout_key(),
+                pressed_frames=[PressedFrame("-")],
             )
 
         if self._input_blocked:
@@ -150,6 +160,7 @@ class MappingEngine:
                 release_all=bool(events),
                 mumble=self._mumble,
                 layout_key=self._layout_key(),
+                pressed_frames=self._pressed_frames(pad, now_s),
             )
 
         threshold = max(0.08, self.profile.long_press_ms / 1000.0)
@@ -186,6 +197,7 @@ class MappingEngine:
             radial=self._radial_view(),
             mumble=self._mumble,
             layout_key=self._layout_key(),
+            pressed_frames=self._pressed_frames(pad, now_s),
         )
 
     def _on_press(self, button: str, now_s: float) -> list[InputEvent]:
@@ -388,6 +400,64 @@ class MappingEngine:
         if not self._mod_order:
             return "default"
         return "+".join(self._mod_order)
+
+    def _pressed_frames(self, pad: PadState, now_s: float) -> list[PressedFrame]:
+        from gw2controller.overlay.slot import overlay_button_label
+
+        pressed = [name for name in ALL_BUTTONS if pad.buttons.get(name)]
+        if not pressed:
+            return [PressedFrame("-")]
+
+        threshold = max(0.08, self.profile.long_press_ms / 1000.0)
+        mod_set = set(self._mod_order)
+        non_mods = [name for name in pressed if name not in mod_set]
+        frames: list[PressedFrame] = []
+        used_mods: set[str] = set()
+
+        for button in non_mods:
+            mod = self._modifier_for_display(button)
+            if mod:
+                label = f"{overlay_button_label(mod)} + {overlay_button_label(button)}"
+                used_mods.add(mod)
+            else:
+                label = overlay_button_label(button)
+            progress, pending = self._long_progress(button, now_s, threshold)
+            frames.append(PressedFrame(label, progress, pending))
+
+        # Modificador sozinho (sem outro botão): mostra o mod.
+        # Se há botão sem override, o mod não aparece — só o botão base.
+        if not non_mods:
+            for mod in self._mod_order:
+                if mod in pressed:
+                    frames.append(PressedFrame(overlay_button_label(mod), 1.0, False))
+
+        return frames or [PressedFrame("-")]
+
+    def _modifier_for_display(self, button: str) -> str | None:
+        for mod in reversed(self._mod_order):
+            if mod == button:
+                continue
+            action = self._active.get(mod)
+            if action is None or action.type != "modifier":
+                continue
+            override = action.overrides.get(button)
+            if override is not None and override.is_active():
+                return mod
+        return None
+
+    def _long_progress(self, button: str, now_s: float, threshold: float) -> tuple[float, bool]:
+        mapping = self.profile.button_map(button)
+        if mapping.mode != "short_long":
+            return 1.0, False
+        if self._override_for(button) is not None:
+            return 1.0, False
+        if button in self._long_armed:
+            return 1.0, False
+        if mapping.short.type in ("modifier", "radial"):
+            return 1.0, False
+        started = self._down_since.get(button, now_s)
+        progress = min(1.0, max(0.0, (now_s - started) / threshold))
+        return progress, True
 
     def _runtime_label(self) -> str:
         parts: list[str] = []

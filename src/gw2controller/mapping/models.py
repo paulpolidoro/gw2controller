@@ -270,6 +270,10 @@ class OverlayConfig:
     item_size: int = 44
     slots: list[OverlaySlot] = field(default_factory=list)
     layouts: dict[str, list[OverlaySlot]] = field(default_factory=dict)
+    current_buttons_enabled: bool = False
+    current_buttons_movable: bool = False
+    current_buttons_x: int = 40
+    current_buttons_y: int = 40
 
     def layout_keys(self) -> list[str]:
         keys = [DEFAULT_LAYOUT_KEY]
@@ -331,6 +335,10 @@ class OverlayConfig:
             item_size=item_size,
             slots=slots,
             layouts=layouts,
+            current_buttons_enabled=bool(data.get("current_buttons_enabled", False)),
+            current_buttons_movable=bool(data.get("current_buttons_movable", False)),
+            current_buttons_x=int(data.get("current_buttons_x", 40)),
+            current_buttons_y=int(data.get("current_buttons_y", 40)),
         )
 
 
@@ -442,6 +450,10 @@ class Profile:
                     name: [asdict(slot) for slot in slots]
                     for name, slots in self.overlay.layouts.items()
                 },
+                "current_buttons_enabled": self.overlay.current_buttons_enabled,
+                "current_buttons_movable": self.overlay.current_buttons_movable,
+                "current_buttons_x": self.overlay.current_buttons_x,
+                "current_buttons_y": self.overlay.current_buttons_y,
             },
             "context_layers": self.context_layers.to_dict(),
         }

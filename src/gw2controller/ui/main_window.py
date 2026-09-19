@@ -89,6 +89,8 @@ class MainWindow(QMainWindow):
         self._item_size = QSlider(Qt.Orientation.Horizontal)
         self._item_size_label = QLabel()
         self._overlay_layout = QComboBox()
+        self._current_buttons_enabled = QCheckBox("Mostrar botões atuais")
+        self._current_buttons_movable = QCheckBox("Permitir mover botões atuais")
 
         self._build()
         self._build_menu()
@@ -240,12 +242,14 @@ class MainWindow(QMainWindow):
         self._item_size.setRange(20, 96)
         self._item_size.valueChanged.connect(self._read_item_size)
         self._overlay_layout.currentIndexChanged.connect(self._read_overlay_layout)
+        self._current_buttons_enabled.toggled.connect(self._read_current_buttons)
+        self._current_buttons_movable.toggled.connect(self._read_current_buttons)
 
         hint = QLabel(
             "O overlay mostra só o nome do botão (X, RB…). "
             "Salve posições por layout: Padrão ou cada modificadora (LB, RB…). "
             "Em jogo, segurar o modificador troca o layout automaticamente. "
-            "No modo edição, escolha o layout abaixo para posicionar."
+            "Botões atuais: quadros com o que está pressionado e barra de long-press."
         )
         hint.setWordWrap(True)
 
@@ -279,6 +283,17 @@ class MainWindow(QMainWindow):
         row.addWidget(hide_btn)
         row.addStretch()
 
+        current_box = QGroupBox("Botões atuais")
+        current_layout = QVBoxLayout(current_box)
+        current_layout.addWidget(self._current_buttons_enabled)
+        current_layout.addWidget(self._current_buttons_movable)
+        current_layout.addWidget(
+            QLabel(
+                "Com modificadora + botão com override: LT + A. "
+                "Se o botão mantém a função base: só ←. Idle: —"
+            )
+        )
+
         layout = QVBoxLayout()
         layout.addWidget(self._overlay_visible)
         layout.addLayout(screen_row)
@@ -287,6 +302,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(size_row)
         layout.addLayout(alpha_row)
         layout.addLayout(row)
+        layout.addWidget(current_box)
         layout.addWidget(hint)
         layout.addStretch()
         page = QWidget()
@@ -338,6 +354,7 @@ class MainWindow(QMainWindow):
         self._refresh_radial_alpha()
         self._refresh_item_size()
         self._refresh_overlay_layout()
+        self._refresh_current_buttons()
         self._map_open_tab.overrides = self.profile.context_layers.map_open
         self._chat_tab.overrides = self.profile.context_layers.chat
         self._mounted_tab.overrides = self.profile.context_layers.mounted
@@ -637,3 +654,19 @@ class MainWindow(QMainWindow):
         if data is None:
             return
         self.overlay_layout_selected.emit(str(data))
+
+    def _refresh_current_buttons(self) -> None:
+        self._current_buttons_enabled.blockSignals(True)
+        self._current_buttons_movable.blockSignals(True)
+        self._current_buttons_enabled.setChecked(self.profile.overlay.current_buttons_enabled)
+        self._current_buttons_movable.setChecked(self.profile.overlay.current_buttons_movable)
+        self._current_buttons_movable.setEnabled(self.profile.overlay.current_buttons_enabled)
+        self._current_buttons_enabled.blockSignals(False)
+        self._current_buttons_movable.blockSignals(False)
+
+    def _read_current_buttons(self) -> None:
+        enabled = self._current_buttons_enabled.isChecked()
+        self.profile.overlay.current_buttons_enabled = enabled
+        self.profile.overlay.current_buttons_movable = self._current_buttons_movable.isChecked()
+        self._current_buttons_movable.setEnabled(enabled)
+        self.profile_changed.emit()
