@@ -1,0 +1,401 @@
+{
+  "name": "MMORPG Default",
+  "long_press_ms": 400,
+  "radial_deadzone": 0.35,
+  "trigger_threshold": 0.5,
+  "hotkeys": {
+    "toggle_overlay_edit": "F8",
+    "toggle_overlay_visible": "F9"
+  },
+  "buttons": {
+    "A": {
+      "mode": "press",
+      "press": {
+        "type": "keys",
+        "keys": [
+          "space"
+        ]
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "B": {
+      "mode": "short_long",
+      "short": {
+        "type": "keys",
+        "keys": [
+          "c"
+        ]
+      },
+      "long": {
+        "type": "none"
+      }
+    },
+    "X": {
+      "mode": "short_long",
+      "short": {
+        "type": "keys",
+        "keys": [
+          "q"
+        ]
+      },
+      "long": {
+        "type": "none"
+      }
+    },
+    "Y": {
+      "mode": "short_long",
+      "short": {
+        "type": "keys",
+        "keys": [
+          "0"
+        ]
+      },
+      "long": {
+        "type": "none"
+      }
+    },
+    "LT": {
+      "mode": "press",
+      "press": {
+        "type": "modifier",
+        "overrides": {
+          "A": {
+            "type": "keys",
+            "keys": [
+              "mouse_x2"
+            ]
+          },
+          "X": {
+            "type": "keys",
+            "keys": [
+              "e"
+            ]
+          },
+          "B": {
+            "type": "keys",
+            "keys": [
+              "r"
+            ]
+          },
+          "Y": {
+            "type": "keys",
+            "keys": [
+              "mouse_middle"
+            ]
+          }
+        }
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "RT": {
+      "mode": "press",
+      "press": {
+        "type": "modifier",
+        "overrides": {
+          "A": {
+            "type": "keys",
+            "keys": [
+              "2"
+            ]
+          },
+          "X": {
+            "type": "keys",
+            "keys": [
+              "3"
+            ]
+          },
+          "B": {
+            "type": "keys",
+            "keys": [
+              "4"
+            ]
+          },
+          "Y": {
+            "type": "keys",
+            "keys": [
+              "5"
+            ]
+          }
+        }
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "LS": {
+      "mode": "short_long",
+      "short": {
+        "type": "keys",
+        "keys": [
+          "mouse_left"
+        ]
+      },
+      "long": {
+        "type": "keys",
+        "keys": [
+          "mouse_right"
+        ]
+      }
+    },
+    "RS": {
+      "mode": "short_long",
+      "short": {
+        "type": "keys",
+        "keys": [
+          "f"
+        ]
+      },
+      "long": {
+        "type": "keys",
+        "keys": [
+          "j"
+        ]
+      }
+    },
+    "DPAD_UP": {
+      "mode": "press",
+      "press": {
+        "type": "radial",
+        "radial_items": [
+          {
+            "label": "SKYSCALE",
+            "keys": [
+              "num 6"
+            ]
+          },
+          {
+            "label": "RAPTOR",
+            "keys": [
+              "num 1"
+            ]
+          },
+          {
+            "label": "SPRINGER",
+            "keys": [
+              "num 2"
+            ]
+          },
+          {
+            "label": "DESMONTAR",
+            "keys": [
+              "v"
+            ]
+          },
+          {
+            "label": "SKIMMER",
+            "keys": [
+              "num 3"
+            ]
+          },
+          {
+            "label": "WARCLAW",
+            "keys": [
+              "num 5"
+            ]
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          }
+        ]
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "DPAD_DOWN": {
+      "mode": "press",
+      "press": {
+        "type": "keys",
+        "keys": [
+          "i"
+        ]
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "DPAD_LEFT": {
+      "mode": "press",
+      "press": {
+        "type": "keys",
+        "keys": [
+          "h"
+        ]
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "DPAD_RIGHT": {
+      "mode": "press",
+      "press": {
+        "type": "radial",
+        "radial_items": [
+          {
+            "label": "RIFT SCAN",
+            "keys": [
+              "ctrl",
+              "num1"
+            ]
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          }
+        ]
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "VIEW": {
+      "mode": "press",
+      "press": {
+        "type": "keys",
+        "keys": [
+          "m"
+        ]
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "MENU": {
+      "mode": "press",
+      "press": {
+        "type": "keys",
+        "keys": [
+          "escape"
+        ]
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "LB": {
+      "mode": "press",
+      "press": {
+        "type": "modifier",
+        "overrides": {
+          "A": {
+            "type": "keys",
+            "keys": [
+              "f1"
+            ]
+          },
+          "X": {
+            "type": "keys",
+            "keys": [
+              "f2"
+            ]
+          },
+          "B": {
+            "type": "keys",
+            "keys": [
+              "f3"
+            ]
+          },
+          "Y": {
+            "type": "keys",
+            "keys": [
+              "f4"
+            ]
+          },
+          "RB": {
+            "type": "keys",
+            "keys": [
+              "f5"
+            ]
+          }
+        }
+      },
+      "release": {
+        "type": "none"
+      }
+    },
+    "RB": {
+      "mode": "press",
+      "press": {
+        "type": "keys",
+        "keys": [
+          "1"
+        ]
+      },
+      "release": {
+        "type": "none"
+      }
+    }
+  },
+  "sticks": {
+    "left": {
+      "mode": "wasd",
+      "deadzone": 0.2,
+      "sensitivity": 1.0,
+      "keys": {
+        "up": "w",
+        "down": "s",
+        "left": "a",
+        "right": "d"
+      }
+    },
+    "right": {
+      "mode": "mouse",
+      "deadzone": 0.12,
+      "sensitivity": 12.0,
+      "keys": {
+        "up": "w",
+        "down": "s",
+        "left": "a",
+        "right": "d"
+      }
+    }
+  },
+  "overlay": {
+    "visible": false,
+    "screen_index": -1,
+    "theme": "dark",
+    "radial_alpha": 66,
+    "slots": [
+      {
+        "button": "X",
+        "x": 938,
+        "y": 940,
+        "size": 44,
+        "id": "slot1"
+      }
+    ]
+  }
+}
