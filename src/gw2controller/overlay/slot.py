@@ -73,7 +73,10 @@ class OverlaySlotWidget(QWidget):
             self.resized.emit()
 
     def _apply_size(self) -> None:
-        self.setFixedSize(self.slot_size + 8, self.slot_size + 4)
+        label = overlay_button_label(self.button)
+        # Largura mínima maior para textos como View/Menu não ficarem cortados.
+        width = max(self.slot_size + 8, 12 + len(label) * max(7, self.slot_size // 3))
+        self.setFixedSize(width, self.slot_size + 4)
         self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:  # noqa: ARG002
@@ -94,7 +97,7 @@ class OverlaySlotWidget(QWidget):
         painter.setPen(self.theme.glyph_fg)
         font_size = max(9, int(self.slot_size * 0.42))
         if len(label) > 2:
-            font_size = max(8, int(self.slot_size * 0.28))
+            font_size = max(8, int(self.slot_size * 0.32))
         painter.setFont(QFont("Segoe UI", font_size, QFont.Weight.Bold))
         painter.drawText(box, Qt.AlignmentFlag.AlignCenter, label)
         painter.end()

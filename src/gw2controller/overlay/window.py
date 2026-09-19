@@ -85,7 +85,7 @@ class OverlayWindow(QWidget):
 
     def __init__(self) -> None:
         super().__init__(None)
-        self.setWindowTitle("GW2Controller Overlay")
+        self.setWindowTitle("Sobreposição GW2Controller")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
@@ -317,10 +317,15 @@ class OverlayWindow(QWidget):
             _set_click_through(hwnd, enabled)
 
     def _place_banner(self) -> None:
+        from gw2controller.controller.xinput import BUTTON_LABELS
+
         screen = self._target_screen()
-        layout = "Padrão" if self._layout_key == DEFAULT_LAYOUT_KEY else self._layout_key
+        if self._layout_key == DEFAULT_LAYOUT_KEY:
+            layout = "Padrão"
+        else:
+            layout = BUTTON_LABELS.get(self._layout_key, self._layout_key)
         self._banner.setText(
-            f"Edição [{layout}] — arraste nesta tela ({_screen_label(screen)}) "
+            f"Posicionando [{layout}] — arraste nesta tela ({_screen_label(screen)}) "
             "• scroll no tamanho • botão direito remove • F8 sai"
         )
         self._banner.adjustSize()

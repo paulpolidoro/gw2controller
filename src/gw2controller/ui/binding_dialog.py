@@ -221,19 +221,19 @@ class FunctionDialog(QDialog):
         self._none = QRadioButton("Nenhuma")
         self._keys = QRadioButton("Tecla(s)")
         self._modifier = QRadioButton("Modificadora")
-        self._radial = QRadioButton("Radial select")
+        self._radial = QRadioButton("Menu radial")
         self._keys_editor = KeysEditor()
         self._radial_table = QTableWidget(MAX_RADIAL_ITEMS, 2)
-        self._radial_table.setHorizontalHeaderLabels(["Nome", "Teclas (ex: shift+1)"])
+        self._radial_table.setHorizontalHeaderLabels(["Nome", "Teclas (ex.: shift+1)"])
         self._radial_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._mod_hint = QLabel(
-            "Enquanto este botão estiver ativo, os outros botões usam os overrides da aba Mod. "
-            "Os que você não alterar continuam com a função base."
+            "Enquanto este botão estiver ativo, os outros botões usam as funções da aba Mod. "
+            "Os que você não alterar continuam com a função normal."
         )
         self._mod_hint.setWordWrap(True)
         self._radial_hint = QLabel(
-            "Até 8 itens. Segure o botão e use o analógico direito para escolher. "
-            "Ao soltar, dispara as teclas do item. Deixe a linha vazia para não usar o setor."
+            "Até 8 opções. Segure o botão e use o analógico direito para escolher. "
+            "Ao soltar, dispara as teclas da opção. Deixe a linha vazia para não usar aquele setor."
         )
         self._radial_hint.setWordWrap(True)
 
@@ -247,9 +247,11 @@ class FunctionDialog(QDialog):
         form.addRow(self._radial_hint)
         form.addRow(self._radial_table)
 
-        box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        box.accepted.connect(self.accept)
-        box.rejected.connect(self.reject)
+        box = QDialogButtonBox()
+        ok_btn = box.addButton("OK", QDialogButtonBox.ButtonRole.AcceptRole)
+        cancel_btn = box.addButton("Cancelar", QDialogButtonBox.ButtonRole.RejectRole)
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn.clicked.connect(self.reject)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(box)
@@ -327,8 +329,8 @@ class ModifierTab(QWidget):
         self.action = action
         self._layer = OverrideLayerTab(
             title_hint=(
-                f"Overrides de {BUTTON_LABELS.get(owner_button, owner_button)}. "
-                "Vazio = mantém a função base do botão."
+                f"Funções especiais enquanto segura {BUTTON_LABELS.get(owner_button, owner_button)}. "
+                "Deixe em branco para manter a função normal do botão."
             ),
             overrides=action.overrides,
             exclude_button=owner_button,
@@ -378,11 +380,11 @@ class OverrideLayerTab(QWidget):
             label.setFlags(label.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._table.setItem(row, 0, label)
             override = self.overrides.get(button, Action())
-            current = QTableWidgetItem(override.label() if override.is_active() else "Função base")
+            current = QTableWidgetItem(override.label() if override.is_active() else "Função normal")
             current.setFlags(current.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._table.setItem(row, 1, current)
             edit = QPushButton("Definir")
-            clear = QPushButton("Base")
+            clear = QPushButton("Normal")
             cell = QWidget()
             box = QHBoxLayout(cell)
             box.setContentsMargins(4, 2, 4, 2)

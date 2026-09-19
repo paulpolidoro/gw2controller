@@ -45,6 +45,7 @@ class TickResult:
     mumble: MumbleState = field(default_factory=MumbleState)
     layout_key: str = "default"
     pressed_frames: list[PressedFrame] = field(default_factory=list)
+    long_triggered: bool = False
 
 
 def apply_radial_deadzone(x: float, y: float, deadzone: float) -> tuple[float, float]:
@@ -164,6 +165,7 @@ class MappingEngine:
             )
 
         threshold = max(0.08, self.profile.long_press_ms / 1000.0)
+        long_triggered = False
 
         for button in ALL_BUTTONS:
             down = bool(pad.buttons.get(button))
@@ -173,7 +175,9 @@ class MappingEngine:
                 self._long_armed.discard(button)
                 events.extend(self._on_press(button, now_s))
             elif down and was_down:
-                events.extend(self._on_hold(button, now_s, threshold))
+                hold_events, fired_long = self._on_hold(button, now_s, threshold)
+                events.extend(hold_events)
+                long_triggered = long_triggered or fired_long
             elif not down and was_down:
                 events.extend(self._on_release(button, now_s, threshold))
 
@@ -198,6 +202,7 @@ class MappingEngine:
             mumble=self._mumble,
             layout_key=self._layout_key(),
             pressed_frames=self._pressed_frames(pad, now_s),
+            long_triggered=long_triggered,
         )
 
     def _on_press(self, button: str, now_s: float) -> list[InputEvent]:
@@ -211,22 +216,23 @@ class MappingEngine:
             return self._activate(button, mapping.short)
         return []
 
-    def _on_hold(self, button: str, now_s: float, threshold: float) -> list[InputEvent]:
+    def _on_hold(self, button: str, now_s: float, threshold: float) -> tuple[list[InputEvent], bool]:
         mapping = self.profile.button_map(button)
         if mapping.mode != "short_long" or button in self._long_armed:
-            return []
+            return [], False
         if self._override_for(button) is not None:
-            return []
+            return [], False
         started = self._down_since.get(button, now_s)
         if now_s - started < threshold:
-            return []
+            return [], False
         self._long_armed.add(button)
         events: list[InputEvent] = []
         current = self._active.get(button)
         if current is not None:
             events.extend(self._deactivate(button, fire_radial=False))
         events.extend(self._activate(button, mapping.long))
-        return events
+        # Vibra mesmo se o longo estiver vazio — confirma que o limiar foi atingido.
+        return events, True
 
     def _on_release(self, button: str, now_s: float, threshold: float) -> list[InputEvent]:
         mapping = self.profile.button_map(button)
@@ -399,7 +405,8 @@ class MappingEngine:
     def _layout_key(self) -> str:
         if not self._mod_order:
             return "default"
-        return "+".join(self._mod_order)
+        # Usa só o modificador mais recente (evita chaves tipo LB+LT sem layout).
+        return self._mod_order[-1]
 
     def _pressed_frames(self, pad: PadState, now_s: float) -> list[PressedFrame]:
         from gw2controller.overlay.slot import overlay_button_label
@@ -460,15 +467,17 @@ class MappingEngine:
         return progress, True
 
     def _runtime_label(self) -> str:
+        from gw2controller.controller.xinput import BUTTON_LABELS
+
         parts: list[str] = []
         if self._mod_order:
-            parts.append("+".join(self._mod_order))
+            parts.append("+".join(BUTTON_LABELS.get(name, name) for name in self._mod_order))
         if self._mumble.map_open:
             parts.append("Mapa")
         if self._mumble.textbox_focused:
             parts.append("Chat")
         if self._mumble.mounted:
-            parts.append("Montado")
+            parts.append("Montaria")
         if self._input_blocked:
             parts.append("Bloqueado")
         return " · ".join(parts) if parts else "Padrão"

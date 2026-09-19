@@ -72,17 +72,20 @@ class MumbleState:
 
     def status_label(self) -> str:
         if not self.available:
-            return "Mumble: off"
+            return "Jogo: sem sinal"
         parts = []
         if self.map_open:
-            parts.append("Mapa")
+            parts.append("mapa")
         if self.textbox_focused:
-            parts.append("Chat")
+            parts.append("chat")
         if self.mounted:
-            parts.append("Montado")
+            parts.append("montaria")
         if not self.game_focused:
-            parts.append("Sem foco")
-        return "Mumble: " + (" · ".join(parts) if parts else "ok")
+            parts.append("fora de foco")
+        if parts:
+            return "Jogo: " + " · ".join(parts)
+        name = self.character.strip() if self.character else ""
+        return f"Jogo: {name}" if name else "Jogo: conectado"
 
 
 class MumbleLinkReader:

@@ -155,7 +155,7 @@ class GW2ControllerApp:
             self.overlay.sync_slots_to_profile()
             save_profile(self.profile, self.profile_path)
         self.window.statusBar().showMessage(
-            "Modo edição do overlay" if enabled else "Modo jogo — cliques atravessam o overlay",
+            "Posicionando ícones na tela" if enabled else "Pronto — cliques passam pela sobreposição",
             2500,
         )
 
@@ -203,6 +203,8 @@ class GW2ControllerApp:
         )
         if self.profile.overlay.current_buttons_enabled:
             self.current_buttons.set_frames(result.pressed_frames)
+        if result.long_triggered and self.profile.long_press_rumble:
+            self.reader.pulse()
         self._last_layer = result.runtime_label
         self.window.set_pad_state(pad, result.runtime_label, result.mumble)
 
@@ -240,6 +242,7 @@ class GW2ControllerApp:
 
     def shutdown(self) -> None:
         self._timer.stop()
+        self.reader.stop_vibration()
         self.sender.release_all()
         self.mumble.close()
         if self._hotkeys is not None:

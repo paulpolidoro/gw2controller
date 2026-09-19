@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import time
 from ctypes import wintypes
 from dataclasses import dataclass, field
 from typing import Any
@@ -59,12 +60,12 @@ BUTTON_LABELS: dict[str, str] = {
     "RB": "RB",
     "LT": "LT",
     "RT": "RT",
-    "LS": "LS (click)",
-    "RS": "RS (click)",
-    "DPAD_UP": "D-pad cima",
-    "DPAD_DOWN": "D-pad baixo",
-    "DPAD_LEFT": "D-pad esquerda",
-    "DPAD_RIGHT": "D-pad direita",
+    "LS": "LS (clique)",
+    "RS": "RS (clique)",
+    "DPAD_UP": "D-pad ↑",
+    "DPAD_DOWN": "D-pad ↓",
+    "DPAD_LEFT": "D-pad ←",
+    "DPAD_RIGHT": "D-pad →",
     "VIEW": "View",
     "MENU": "Menu",
 }
@@ -86,6 +87,13 @@ class XINPUT_STATE(ctypes.Structure):
     _fields_ = [
         ("dwPacketNumber", wintypes.DWORD),
         ("Gamepad", XINPUT_GAMEPAD),
+    ]
+
+
+class XINPUT_VIBRATION(ctypes.Structure):
+    _fields_ = [
+        ("wLeftMotorSpeed", wintypes.WORD),
+        ("wRightMotorSpeed", wintypes.WORD),
     ]
 
 
@@ -131,12 +139,18 @@ class XInputReader:
         self.trigger_threshold = trigger_threshold
         self._dll: Any | None = None
         self._get_state: Any | None = None
+        self._set_state: Any | None = None
         self._load_error: str | None = None
+        self._rumble_until = 0.0
+        self._was_connected = False
         try:
             self._dll = _load_xinput()
             self._get_state = self._dll.XInputGetState
             self._get_state.argtypes = [wintypes.DWORD, ctypes.POINTER(XINPUT_STATE)]
             self._get_state.restype = wintypes.DWORD
+            self._set_state = self._dll.XInputSetState
+            self._set_state.argtypes = [wintypes.DWORD, ctypes.POINTER(XINPUT_VIBRATION)]
+            self._set_state.restype = wintypes.DWORD
         except OSError as exc:
             self._load_error = str(exc)
 
@@ -148,16 +162,48 @@ class XInputReader:
     def load_error(self) -> str | None:
         return self._load_error
 
+    def set_vibration(self, left: float = 0.0, right: float = 0.0) -> None:
+        """Intensidade 0.0–1.0 por motor (esquerdo = grave, direito = agudo)."""
+        if self._set_state is None:
+            return
+        vibration = XINPUT_VIBRATION(
+            wLeftMotorSpeed=int(max(0.0, min(1.0, left)) * 65535),
+            wRightMotorSpeed=int(max(0.0, min(1.0, right)) * 65535),
+        )
+        self._set_state(self.index, ctypes.byref(vibration))
+
+    def pulse(self, *, left: float = 0.15, right: float = 0.45, duration_ms: int = 90) -> None:
+        """Pulso curto — bom feedback de long-press."""
+        self._rumble_until = time.perf_counter() + max(0.03, duration_ms / 1000.0)
+        self.set_vibration(left, right)
+
+    def stop_vibration(self) -> None:
+        self._rumble_until = 0.0
+        self.set_vibration(0.0, 0.0)
+
+    def _update_rumble(self, connected: bool) -> None:
+        if not connected:
+            if self._was_connected:
+                self.stop_vibration()
+            self._was_connected = False
+            return
+        self._was_connected = True
+        if self._rumble_until and time.perf_counter() >= self._rumble_until:
+            self.stop_vibration()
+
     def read(self) -> PadState:
         empty = {name: False for name in ALL_BUTTONS}
         if self._get_state is None:
+            self._update_rumble(False)
             return PadState(connected=False, index=self.index, buttons=empty)
 
         state = XINPUT_STATE()
         result = self._get_state(self.index, ctypes.byref(state))
         if result != ERROR_SUCCESS:
+            self._update_rumble(False)
             return PadState(connected=False, index=self.index, buttons=empty)
 
+        self._update_rumble(True)
         pad = state.Gamepad
         buttons = {
             name: bool(pad.wButtons & mask) for name, mask in BUTTON_MASKS.items()

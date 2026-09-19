@@ -66,7 +66,7 @@ def default_profile() -> Profile:
         ),
     }
     return Profile(
-        name="GW2 Default",
+        name="GW2 Padrão",
         buttons=buttons,
         sticks={
             "left": StickConfig(mode="wasd", deadzone=0.2, sensitivity=1.0),

@@ -1,6 +1,14 @@
 # GW2Controller
 
-Mapeador de **controle Xbox** para teclado e mouse, pensado para **Guild Wars 2**. Inclui camadas de modificador, short/long press, release, radial no stick direito, overlay transparente e integração com **MumbleLink**.
+Transforma um **controle Xbox** em teclado e mouse para **Guild Wars 2**. Ideal se você quer jogar com controle sem abrir mão das skills e atalhos do teclado.
+
+Inclui:
+
+- Funções **ao apertar**, **ao soltar** e **curto / longo**
+- **Modificadoras** (ex.: LB muda o que A/B/X fazem)
+- **Menu radial** no analógico direito
+- **Sobreposição** transparente com o nome dos botões sobre as skills
+- Camadas automáticas via **MumbleLink** (mapa, chat, montaria)
 
 Repositório: [paulpolidoro/gw2controller](https://github.com/paulpolidoro/gw2controller)
 
@@ -9,7 +17,7 @@ Repositório: [paulpolidoro/gw2controller](https://github.com/paulpolidoro/gw2co
 - Windows 10/11
 - Python 3.11 ou superior
 - Controle Xbox / XInput
-- Guild Wars 2 em **janela** ou **borderless** (o overlay não aparece em tela cheia exclusiva)
+- Guild Wars 2 em **janela** ou **sem bordas** (a sobreposição não aparece em tela cheia exclusiva)
 
 ## Instalação
 
@@ -29,32 +37,33 @@ Duplo clique em `run.bat`, ou:
 python run.py
 ```
 
-## MumbleLink (contexto do jogo)
+## Contexto do jogo (MumbleLink)
 
-O app lê a shared memory `MumbleLink` do GW2:
+O app lê o sinal do GW2 e troca funções sozinho:
 
-| Fonte | Efeito |
-|-------|--------|
-| Bit 1 — Map open | Overrides da aba **Map open** |
-| Bit 4 — Game focus | Sem foco no jogo → não envia input |
-| Bit 6 — Textbox focus | Overrides da aba **Chat** |
-| `mountIndex ≠ 0` | Overrides da aba **Mounted** |
+| Situação | O que acontece |
+|----------|----------------|
+| Mapa do mundo aberto (M) | Usa a aba **Mapa aberto** |
+| Chat / campo de texto ativo | Usa a aba **Chat** |
+| Personagem em montaria | Usa a aba **Montaria** |
+| Jogo sem foco | Não envia teclas (evita digitar fora do jogo) |
 
-Prioridade: **modificador** → **Map open** → **Chat** → **Mounted** → **base**.  
-Nas abas de contexto, botão vazio = mantém a função base.
+Ordem de prioridade: **modificadora** → **mapa** → **chat** → **montaria** → **função normal**.  
+Nas abas de contexto, deixe em branco para manter a função normal do botão.
 
 ## Como usar
 
-1. Conecte o controle e abra o GW2 (janela/borderless).
-2. Ajuste o mapeamento na aba **Botões**.
-3. Configure overrides de mapa e montaria nas abas **Map open** e **Mounted**.
-4. **F8** edita o overlay; **F9** mostra/oculta.
+1. Conecte o controle e abra o GW2 (janela ou sem bordas).
+2. Na aba **Botões**, defina o que cada botão faz.
+3. Se quiser, configure **Mapa aberto**, **Chat** e **Montaria**.
+4. Na aba **Sobreposição**, marque mostrar, escolha a tela e pressione **F8** para posicionar os nomes sobre as skills.
+5. **F9** mostra ou oculta a sobreposição.
 
-Fechar a janela minimiza para a bandeja. **Arquivo → Sair** encerra.
+Fechar a janela minimiza para a bandeja. Use **Arquivo → Sair** para encerrar de verdade.
 
 ## Perfis
 
-Perfis em `profiles/*.json` (**Salvar** / **Salvar como**).
+Os perfis ficam em `profiles/*.json`. Use **Salvar** ou **Salvar como…** na barra superior.
 
 ## Observações
 

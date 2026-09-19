@@ -64,8 +64,8 @@ class MainWindow(QMainWindow):
         self._name = QLineEdit(profile.name)
         self._profile_combo = QComboBox()
         self._status = QLabel("Procurando controle Xbox…")
-        self._layer_label = QLabel("Modificadores: Padrão")
-        self._mumble_label = QLabel("Mumble: off")
+        self._layer_label = QLabel("Camada: Padrão")
+        self._mumble_label = QLabel("Jogo: sem sinal")
         self._table = QTableWidget(0, 4)
         self._tabs = QTabWidget()
         self._modifier_tabs: dict[tuple[str, str], ModifierTab] = {}
@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         self._right_dead_label = QLabel()
         self._right_sens_label = QLabel()
         self._slot_button = QComboBox()
-        self._overlay_visible = QCheckBox("Mostrar overlay")
+        self._overlay_visible = QCheckBox("Mostrar sobreposição de skills")
         self._overlay_screen = QComboBox()
         self._overlay_theme = QComboBox()
         self._radial_alpha = QSlider(Qt.Orientation.Horizontal)
@@ -89,8 +89,9 @@ class MainWindow(QMainWindow):
         self._item_size = QSlider(Qt.Orientation.Horizontal)
         self._item_size_label = QLabel()
         self._overlay_layout = QComboBox()
-        self._current_buttons_enabled = QCheckBox("Mostrar botões atuais")
-        self._current_buttons_movable = QCheckBox("Permitir mover botões atuais")
+        self._current_buttons_enabled = QCheckBox("Mostrar botões pressionados")
+        self._current_buttons_movable = QCheckBox("Permitir mover esse painel")
+        self._long_rumble = QCheckBox("Vibrar ao ativar longo")
 
         self._build()
         self._build_menu()
@@ -121,27 +122,28 @@ class MainWindow(QMainWindow):
         self._tabs.addTab(self._build_buttons_tab(), "Botões")
         self._tabs.addTab(self._build_sticks_tab(), "Analógicos")
         self._map_open_tab = OverrideLayerTab(
-            "Quando o mapa do mundo (M) estiver aberto. "
-            "Vazio = mantém a função base. Prioridade: modificador > mapa > chat > montado > base.",
+            "Enquanto o mapa do mundo (tecla M) estiver aberto. "
+            "Deixe em branco para manter a função normal do botão. "
+            "Ordem: modificadora → mapa → chat → montaria → normal.",
             self.profile.context_layers.map_open,
         )
         self._chat_tab = OverrideLayerTab(
-            "Quando o chat/textbox do jogo estiver focado. "
-            "Vazio = mantém a função base.",
+            "Enquanto o chat ou um campo de texto do jogo estiver ativo. "
+            "Deixe em branco para manter a função normal do botão.",
             self.profile.context_layers.chat,
         )
         self._mounted_tab = OverrideLayerTab(
-            "Quando estiver montado (mountIndex ≠ 0). "
-            "Vazio = mantém a função base.",
+            "Enquanto o personagem estiver em uma montaria. "
+            "Deixe em branco para manter a função normal do botão.",
             self.profile.context_layers.mounted,
         )
         self._map_open_tab.changed.connect(self._on_context_layer_changed)
         self._chat_tab.changed.connect(self._on_context_layer_changed)
         self._mounted_tab.changed.connect(self._on_context_layer_changed)
-        self._tabs.addTab(self._map_open_tab, "Map open")
+        self._tabs.addTab(self._map_open_tab, "Mapa aberto")
         self._tabs.addTab(self._chat_tab, "Chat")
-        self._tabs.addTab(self._mounted_tab, "Mounted")
-        self._tabs.addTab(self._build_overlay_tab(), "Overlay")
+        self._tabs.addTab(self._mounted_tab, "Montaria")
+        self._tabs.addTab(self._build_overlay_tab(), "Sobreposição")
         self._tabs.addTab(self._build_options_tab(), "Opções")
 
         root = QVBoxLayout()
@@ -153,7 +155,9 @@ class MainWindow(QMainWindow):
         container = QWidget()
         container.setLayout(root)
         self.setCentralWidget(container)
-        self.statusBar().showMessage("F8 edita o overlay • F9 mostra/oculta • deixe o jogo em janela sem bordas")
+        self.statusBar().showMessage(
+            "F8 — posicionar ícones  •  F9 — mostrar/ocultar  •  jogo em janela ou sem bordas"
+        )
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("Arquivo")
@@ -168,13 +172,15 @@ class MainWindow(QMainWindow):
 
     def _build_buttons_tab(self) -> QWidget:
         hint = QLabel(
-            "Press segura a função enquanto o botão está apertado; Release dispara ao soltar. "
-            "Short/Long: soltar rápido dispara o curto; segurar dispara o longo. "
-            "Modificadora abre uma aba para overrides dos outros botões."
+            "Ao apertar: a função fica ativa enquanto o botão estiver pressionado. "
+            "Ao soltar: dispara uma tecla quando você solta o botão. "
+            "Curto / Longo: soltar rápido = curto; segurar = longo. "
+            "Modificadora (ex.: LB): enquanto segura, outros botões podem mudar de função "
+            "(configure na aba Mod)."
         )
         hint.setWordWrap(True)
         self._table.setColumnCount(4)
-        self._table.setHorizontalHeaderLabels(["Botão", "Aperto", "Função / Curto", "Release / Longo"])
+        self._table.setHorizontalHeaderLabels(["Botão", "Modo", "Função / Curto", "Ao soltar / Longo"])
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self._table.verticalHeader().setVisible(False)
@@ -223,11 +229,12 @@ class MainWindow(QMainWindow):
         return page
 
     def _build_overlay_tab(self) -> QWidget:
-        self._slot_button.addItems(ALL_BUTTONS)
-        add_btn = QPushButton("Adicionar item")
+        for button in ALL_BUTTONS:
+            self._slot_button.addItem(BUTTON_LABELS.get(button, button), button)
+        add_btn = QPushButton("Adicionar na tela")
         add_btn.setObjectName("primary")
-        add_btn.clicked.connect(lambda: self.overlay_add_slot.emit(self._slot_button.currentText()))
-        edit_btn = QPushButton("Editar posições (F8)")
+        add_btn.clicked.connect(lambda: self.overlay_add_slot.emit(str(self._slot_button.currentData())))
+        edit_btn = QPushButton("Posicionar (F8)")
         edit_btn.clicked.connect(self.overlay_edit_toggled.emit)
         hide_btn = QPushButton("Mostrar/ocultar (F9)")
         hide_btn.clicked.connect(self.overlay_visibility_toggled.emit)
@@ -246,32 +253,32 @@ class MainWindow(QMainWindow):
         self._current_buttons_movable.toggled.connect(self._read_current_buttons)
 
         hint = QLabel(
-            "O overlay mostra só o nome do botão (X, RB…). "
-            "Salve posições por layout: Padrão ou cada modificadora (LB, RB…). "
-            "Em jogo, segurar o modificador troca o layout automaticamente. "
-            "Botões atuais: quadros com o que está pressionado e barra de long-press."
+            "A sobreposição fica só na tela escolhida (melhor com dois monitores). "
+            "Com F8, arraste os nomes dos botões por cima das skills. "
+            "Cada modificadora (LB, RB…) pode ter posições próprias — escolha em “Layout ativo”. "
+            "O jogo precisa estar em janela ou sem bordas."
         )
         hint.setWordWrap(True)
 
         screen_row = QHBoxLayout()
-        screen_row.addWidget(QLabel("Tela do overlay"))
+        screen_row.addWidget(QLabel("Tela"))
         screen_row.addWidget(self._overlay_screen, 1)
 
         theme_row = QHBoxLayout()
-        theme_row.addWidget(QLabel("Tema do overlay"))
+        theme_row.addWidget(QLabel("Tema"))
         theme_row.addWidget(self._overlay_theme, 1)
 
         layout_row = QHBoxLayout()
-        layout_row.addWidget(QLabel("Layout (modificador)"))
+        layout_row.addWidget(QLabel("Layout ativo"))
         layout_row.addWidget(self._overlay_layout, 1)
 
         alpha_row = QHBoxLayout()
-        alpha_row.addWidget(QLabel("Alpha do radial"))
+        alpha_row.addWidget(QLabel("Opacidade do menu radial"))
         alpha_row.addWidget(self._radial_alpha, 1)
         alpha_row.addWidget(self._radial_alpha_label)
 
         size_row = QHBoxLayout()
-        size_row.addWidget(QLabel("Tamanho dos itens"))
+        size_row.addWidget(QLabel("Tamanho dos nomes"))
         size_row.addWidget(self._item_size, 1)
         size_row.addWidget(self._item_size_label)
 
@@ -283,16 +290,18 @@ class MainWindow(QMainWindow):
         row.addWidget(hide_btn)
         row.addStretch()
 
-        current_box = QGroupBox("Botões atuais")
+        current_box = QGroupBox("Painel de botões pressionados")
         current_layout = QVBoxLayout(current_box)
         current_layout.addWidget(self._current_buttons_enabled)
         current_layout.addWidget(self._current_buttons_movable)
-        current_layout.addWidget(
-            QLabel(
-                "Com modificadora + botão com override: LT + A. "
-                "Se o botão mantém a função base: só ←. Idle: —"
-            )
+        current_hint = QLabel(
+            "Mostra o que você está apertando. "
+            "Com modificadora + skill: “LB + A”. "
+            "Se o botão não muda com a modificadora: só o botão. "
+            "Nada pressionado: —. Em curto/longo, a cor sobe até o longo ativar."
         )
+        current_hint.setWordWrap(True)
+        current_layout.addWidget(current_hint)
 
         layout = QVBoxLayout()
         layout.addWidget(self._overlay_visible)
@@ -319,15 +328,18 @@ class MainWindow(QMainWindow):
         self._long_press.valueChanged.connect(self._read_options)
         self._radial_dead.valueChanged.connect(self._read_options)
         self._trigger.valueChanged.connect(self._read_options)
+        self._long_rumble.toggled.connect(self._read_options)
         form = QFormLayout()
-        form.addRow("Limiar short/long", self._long_press)
-        form.addRow("Zona morta do radial (RS)", self._radial_dead)
-        form.addRow("Limiar dos gatilhos", self._trigger)
-        box = QGroupBox("Tempos")
+        form.addRow("Tempo curto / longo", self._long_press)
+        form.addRow("Zona morta do menu radial", self._radial_dead)
+        form.addRow("Sensibilidade dos gatilhos (LT/RT)", self._trigger)
+        form.addRow(self._long_rumble)
+        box = QGroupBox("Tempos e precisão")
         box.setLayout(form)
         hint = QLabel(
-            "No radial, empurre o analógico direito para escolher o setor. "
-            "A câmera do stick direito pausa enquanto o menu está aberto."
+            "No menu radial, segure o botão e empurre o analógico direito. "
+            "A câmera do stick direito pausa enquanto o menu estiver aberto. "
+            "A vibração confirma quando o longo dispara."
         )
         hint.setWordWrap(True)
         layout = QVBoxLayout()
@@ -381,7 +393,7 @@ class MainWindow(QMainWindow):
         if pad.connected:
             self._status.setText("Controle Xbox conectado")
         else:
-            self._status.setText("Nenhum controle Xbox no slot 0")
+            self._status.setText("Nenhum controle Xbox encontrado")
         self._layer_label.setText(f"Camada: {layer}")
         if mumble is not None:
             self._mumble_label.setText(mumble.status_label())
@@ -442,8 +454,8 @@ class MainWindow(QMainWindow):
             self._table.setItem(row, 0, label)
 
             mode = QComboBox()
-            mode.addItem("Press", "press")
-            mode.addItem("Short / Long", "short_long")
+            mode.addItem("Ao apertar", "press")
+            mode.addItem("Curto / Longo", "short_long")
             mode.setCurrentIndex(1 if mapping.mode == "short_long" else 0)
             mode.currentIndexChanged.connect(lambda _i, b=button, c=mode: self._change_mode(b, str(c.currentData())))
             self._table.setCellWidget(row, 1, mode)
@@ -478,7 +490,7 @@ class MainWindow(QMainWindow):
             current = Action()
         dialog = FunctionDialog(current, self, keys_only=(slot == "release"))
         if slot == "release":
-            dialog.setWindowTitle("Release do botão")
+            dialog.setWindowTitle("Ao soltar o botão")
         if not dialog.exec():
             return
         result = dialog.result_action()
@@ -501,7 +513,7 @@ class MainWindow(QMainWindow):
                     self._tabs.removeTab(index)
                 tab.deleteLater()
                 self._modifier_tabs.pop(key, None)
-        slot_names = {"press": "", "short": " curto", "long": " longo"}
+        slot_names = {"press": "", "short": " (curto)", "long": " (longo)"}
         for button, slot in wanted:
             key = (button, slot)
             mapping = self.profile.button_map(button)
@@ -513,7 +525,8 @@ class MainWindow(QMainWindow):
                 continue
             tab = ModifierTab(button, action, self._tabs)
             tab.changed.connect(self.profile_changed.emit)
-            title = f"Mod {button}{slot_names.get(slot, '')}"
+            label = BUTTON_LABELS.get(button, button)
+            title = f"Mod {label}{slot_names.get(slot, '')}"
             self._tabs.addTab(tab, title)
             self._modifier_tabs[key] = tab
 
@@ -521,17 +534,21 @@ class MainWindow(QMainWindow):
         self._long_press.blockSignals(True)
         self._radial_dead.blockSignals(True)
         self._trigger.blockSignals(True)
+        self._long_rumble.blockSignals(True)
         self._long_press.setValue(self.profile.long_press_ms)
         self._radial_dead.setValue(self.profile.radial_deadzone)
         self._trigger.setValue(self.profile.trigger_threshold)
+        self._long_rumble.setChecked(self.profile.long_press_rumble)
         self._long_press.blockSignals(False)
         self._radial_dead.blockSignals(False)
         self._trigger.blockSignals(False)
+        self._long_rumble.blockSignals(False)
 
     def _read_options(self) -> None:
         self.profile.long_press_ms = self._long_press.value()
         self.profile.radial_deadzone = float(self._radial_dead.value())
         self.profile.trigger_threshold = float(self._trigger.value())
+        self.profile.long_press_rumble = self._long_rumble.isChecked()
         self.profile_changed.emit()
 
     def _load_stick_controls(self) -> None:
@@ -639,12 +656,13 @@ class MainWindow(QMainWindow):
         for button, _slot in self.profile.modifier_sources():
             label = BUTTON_LABELS.get(button, button)
             if self._overlay_layout.findData(button) < 0:
-                self._overlay_layout.addItem(f"Mod {label}", button)
+                self._overlay_layout.addItem(f"Com {label}", button)
         for key in self.profile.overlay.layout_keys():
             if key == DEFAULT_LAYOUT_KEY:
                 continue
             if self._overlay_layout.findData(key) < 0:
-                self._overlay_layout.addItem(key, key)
+                friendly = BUTTON_LABELS.get(key, key)
+                self._overlay_layout.addItem(f"Com {friendly}", key)
         found = self._overlay_layout.findData(current if current else DEFAULT_LAYOUT_KEY)
         self._overlay_layout.setCurrentIndex(found if found >= 0 else 0)
         self._overlay_layout.blockSignals(False)

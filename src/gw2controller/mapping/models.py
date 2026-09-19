@@ -88,9 +88,9 @@ class Action:
             return keys_label(self.keys)
         if self.type == "modifier":
             count = sum(1 for item in self.overrides.values() if item.is_active())
-            return f"Modificador ({count})"
+            return f"Modificadora ({count})"
         if self.type == "radial":
-            return f"Radial ({len(self.active_radial_items())})"
+            return f"Menu radial ({len(self.active_radial_items())})"
         return "—"
 
     @classmethod
@@ -286,8 +286,11 @@ class OverlayConfig:
         name = (key or DEFAULT_LAYOUT_KEY).strip() or DEFAULT_LAYOUT_KEY
         if name == DEFAULT_LAYOUT_KEY:
             return self.slots
-        # Modificador: só o layout dele — nunca mistura com o padrão.
-        return self.layouts.get(name, [])
+        layout = self.layouts.get(name)
+        # Layout ausente ou vazio: mantém o padrão visível (evita “sumir” botões).
+        if layout:
+            return layout
+        return self.slots
 
     def ensure_layout(self, key: str | None) -> list[OverlaySlot]:
         """Garante um layout editável; se o do modificador não existir, copia o padrão."""
@@ -408,6 +411,7 @@ class Profile:
     trigger_threshold: float = 0.5
     long_press_ms: int = 350
     radial_deadzone: float = 0.35
+    long_press_rumble: bool = True
 
     def button_map(self, button: str) -> ButtonMap:
         return self.buttons.get(button, ButtonMap())
@@ -426,6 +430,7 @@ class Profile:
         return {
             "name": self.name,
             "long_press_ms": self.long_press_ms,
+            "long_press_rumble": self.long_press_rumble,
             "radial_deadzone": self.radial_deadzone,
             "trigger_threshold": self.trigger_threshold,
             "hotkeys": asdict(self.hotkeys),
@@ -480,6 +485,7 @@ class Profile:
             trigger_threshold=float(data.get("trigger_threshold", 0.5)),
             long_press_ms=int(data.get("long_press_ms", data.get("sticky_ms", 350))),
             radial_deadzone=float(data.get("radial_deadzone", 0.35)),
+            long_press_rumble=bool(data.get("long_press_rumble", True)),
         )
 
 
