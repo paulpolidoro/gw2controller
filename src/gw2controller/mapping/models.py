@@ -247,27 +247,90 @@ class OverlaySlot:
         )
 
 
+def _clone_slots(slots: list[OverlaySlot]) -> list[OverlaySlot]:
+    return [
+        OverlaySlot(button=slot.button, x=slot.x, y=slot.y, size=slot.size, id=slot.id)
+        for slot in slots
+    ]
+
+
+def _slots_from_list(items: list[Any] | None) -> list[OverlaySlot]:
+    return [OverlaySlot.from_dict(item) for item in list(items or [])]
+
+
+DEFAULT_LAYOUT_KEY = "default"
+
+
 @dataclass
 class OverlayConfig:
     visible: bool = True
     screen_index: int = -1
     theme: str = "dark"
     radial_alpha: int = 90
+    item_size: int = 44
     slots: list[OverlaySlot] = field(default_factory=list)
+    layouts: dict[str, list[OverlaySlot]] = field(default_factory=dict)
+
+    def layout_keys(self) -> list[str]:
+        keys = [DEFAULT_LAYOUT_KEY]
+        for key in sorted(self.layouts):
+            if key != DEFAULT_LAYOUT_KEY and key not in keys:
+                keys.append(key)
+        return keys
+
+    def slots_for(self, key: str | None) -> list[OverlaySlot]:
+        name = (key or DEFAULT_LAYOUT_KEY).strip() or DEFAULT_LAYOUT_KEY
+        if name == DEFAULT_LAYOUT_KEY:
+            return self.slots
+        # Modificador: só o layout dele — nunca mistura com o padrão.
+        return self.layouts.get(name, [])
+
+    def ensure_layout(self, key: str | None) -> list[OverlaySlot]:
+        """Garante um layout editável; se o do modificador não existir, copia o padrão."""
+        name = (key or DEFAULT_LAYOUT_KEY).strip() or DEFAULT_LAYOUT_KEY
+        if name == DEFAULT_LAYOUT_KEY:
+            return self.slots
+        if name not in self.layouts:
+            self.layouts[name] = _clone_slots(self.slots)
+        return self.layouts[name]
+
+    def set_slots_for(self, key: str | None, slots: list[OverlaySlot]) -> None:
+        name = (key or DEFAULT_LAYOUT_KEY).strip() or DEFAULT_LAYOUT_KEY
+        cloned = _clone_slots(slots)
+        if name == DEFAULT_LAYOUT_KEY:
+            self.slots = cloned
+            return
+        self.layouts[name] = cloned
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> OverlayConfig:
         data = data or {}
-        slots = [OverlaySlot.from_dict(item) for item in data.get("slots", [])]
+        slots = _slots_from_list(data.get("slots"))
         theme = str(data.get("theme") or "dark").lower()
         if theme not in ("dark", "light"):
             theme = "dark"
+        item_size = _clamp_percent(data.get("item_size", 44), default=44, minimum=20, maximum=96)
+        if not data.get("item_size") and slots:
+            item_size = _clamp_percent(
+                max((slot.size for slot in slots), default=44),
+                default=44,
+                minimum=20,
+                maximum=96,
+            )
+        layouts: dict[str, list[OverlaySlot]] = {}
+        for name, items in dict(data.get("layouts") or {}).items():
+            key = str(name).strip()
+            if not key or key == DEFAULT_LAYOUT_KEY:
+                continue
+            layouts[key] = _slots_from_list(items)
         return cls(
             visible=bool(data.get("visible", True)),
             screen_index=int(data.get("screen_index", -1)),
             theme=theme,
             radial_alpha=_clamp_percent(data.get("radial_alpha", 90)),
+            item_size=item_size,
             slots=slots,
+            layouts=layouts,
         )
 
 
@@ -373,7 +436,12 @@ class Profile:
                 "screen_index": self.overlay.screen_index,
                 "theme": self.overlay.theme,
                 "radial_alpha": self.overlay.radial_alpha,
+                "item_size": self.overlay.item_size,
                 "slots": [asdict(slot) for slot in self.overlay.slots],
+                "layouts": {
+                    name: [asdict(slot) for slot in slots]
+                    for name, slots in self.overlay.layouts.items()
+                },
             },
             "context_layers": self.context_layers.to_dict(),
         }

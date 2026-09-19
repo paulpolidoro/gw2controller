@@ -36,6 +36,7 @@ class TickResult:
     release_all: bool = False
     radial: RadialView = field(default_factory=RadialView)
     mumble: MumbleState = field(default_factory=MumbleState)
+    layout_key: str = "default"
 
 
 def apply_radial_deadzone(x: float, y: float, deadzone: float) -> tuple[float, float]:
@@ -117,10 +118,20 @@ class MappingEngine:
                 pad,
                 release_all=True,
                 mumble=self._mumble,
+                layout_key=self._layout_key(),
             )
         self._was_connected = pad.connected
         if not pad.connected:
-            return TickResult("Padrão", {}, 0.0, 0.0, [], pad, mumble=self._mumble)
+            return TickResult(
+                "Padrão",
+                {},
+                0.0,
+                0.0,
+                [],
+                pad,
+                mumble=self._mumble,
+                layout_key=self._layout_key(),
+            )
 
         if self._input_blocked:
             # Solta o que ainda estiver apertado e ignora novos inputs.
@@ -138,6 +149,7 @@ class MappingEngine:
                 pad=pad,
                 release_all=bool(events),
                 mumble=self._mumble,
+                layout_key=self._layout_key(),
             )
 
         threshold = max(0.08, self.profile.long_press_ms / 1000.0)
@@ -173,6 +185,7 @@ class MappingEngine:
             pad=pad,
             radial=self._radial_view(),
             mumble=self._mumble,
+            layout_key=self._layout_key(),
         )
 
     def _on_press(self, button: str, now_s: float) -> list[InputEvent]:
@@ -370,6 +383,11 @@ class MappingEngine:
             return RadialView()
         items = [(item.display_label(), keys_label_safe(item.keys)) for item in self._radial_items]
         return RadialView(True, items, self._radial_selected)
+
+    def _layout_key(self) -> str:
+        if not self._mod_order:
+            return "default"
+        return "+".join(self._mod_order)
 
     def _runtime_label(self) -> str:
         parts: list[str] = []

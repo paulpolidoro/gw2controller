@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QComboBox,
@@ -43,10 +43,23 @@ class KeyCaptureEdit(QLineEdit):
         self.key_name = ""
         self.setPlaceholderText("Clique e pressione uma tecla")
         self.setReadOnly(True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def set_key(self, name: str) -> None:
         self.key_name = normalize_key_name(name) if name else ""
         self.setText(key_display_name(self.key_name) if self.key_name else "")
+
+    def focusNextPrevChild(self, next_: bool) -> bool:  # noqa: ARG002
+        # Impede Tab/Shift+Tab de sair do campo sem capturar a tecla.
+        return False
+
+    def event(self, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
+            key = event.key()
+            if key in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
+                self.keyPressEvent(event)
+                return True
+        return super().event(event)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         name = _qt_key_to_name(event)
@@ -75,6 +88,7 @@ def _qt_key_to_name(event: QKeyEvent) -> str | None:
         Qt.Key.Key_Enter: "numpad_enter" if keypad else "enter",
         Qt.Key.Key_Escape: "escape",
         Qt.Key.Key_Tab: "tab",
+        Qt.Key.Key_Backtab: "tab",
         Qt.Key.Key_Backspace: "backspace",
         Qt.Key.Key_Shift: "shift",
         Qt.Key.Key_Control: "ctrl",

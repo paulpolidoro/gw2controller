@@ -56,6 +56,7 @@ class GW2ControllerApp:
         self.window.overlay_edit_toggled.connect(self.toggle_edit_mode)
         self.window.overlay_visibility_toggled.connect(self.toggle_overlay_visible)
         self.window.overlay_add_slot.connect(self.overlay.add_slot)
+        self.window.overlay_layout_selected.connect(self.overlay.set_layout_key)
         self.overlay.slots_changed.connect(self._on_overlay_slots_changed)
         self.tray.edit_action.triggered.connect(self.toggle_edit_mode)
         self.tray.hide_overlay_action.triggered.connect(self.toggle_overlay_visible)
@@ -172,7 +173,7 @@ class GW2ControllerApp:
             pass
         if not self._hotkey_ok:
             self._poll_fallback_hotkeys()
-        self.overlay.set_runtime(result.runtime_label, result.captions)
+        self.overlay.set_runtime(result.runtime_label, result.layout_key)
         self.radial.set_view(
             result.radial,
             self.profile.overlay.screen_index,

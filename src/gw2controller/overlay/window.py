@@ -4,10 +4,10 @@ import ctypes
 from ctypes import wintypes
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPaintEvent, QScreen
+from PySide6.QtGui import QFont, QGuiApplication, QPainter, QPaintEvent, QScreen
 from PySide6.QtWidgets import QLabel, QWidget
 
-from gw2controller.mapping.models import OverlaySlot, Profile
+from gw2controller.mapping.models import DEFAULT_LAYOUT_KEY, OverlaySlot, Profile
 from gw2controller.overlay.slot import OverlaySlotWidget
 from gw2controller.overlay.theme import overlay_theme
 
@@ -96,8 +96,8 @@ class OverlayWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
         self._edit_mode = False
-        self._layer = "default"
-        self._layer_badge: str | None = None
+        self._layout_key = DEFAULT_LAYOUT_KEY
+        self._layout_dirty = False
         self._profile: Profile | None = None
         self._slots: list[OverlaySlotWidget] = []
         self._banner = QLabel("", self)
@@ -160,19 +160,39 @@ class OverlayWindow(QWidget):
             self.hide()
         self._apply_click_through(not self._edit_mode)
 
-    def set_runtime(self, badge: str, captions: dict[str, str]) -> None:
-        shown = None if not badge or badge == "Padrão" else badge.split("+")[0]
-        self._layer = badge
-        self._layer_badge = shown
-        for widget in self._slots:
-            widget.set_layer_badge(shown)
-            widget.set_caption(captions.get(widget.button, ""))
+    def set_runtime(self, badge: str, layout_key: str = DEFAULT_LAYOUT_KEY) -> None:
+        if self._edit_mode:
+            return
+        self.set_layout_key(layout_key or DEFAULT_LAYOUT_KEY)
+
+    def set_layout_key(self, key: str) -> None:
+        name = (key or DEFAULT_LAYOUT_KEY).strip() or DEFAULT_LAYOUT_KEY
+        if name == self._layout_key:
+            return
+        if self._layout_dirty:
+            self.sync_slots_to_profile()
+            self._layout_dirty = False
+        self._layout_key = name
+        # Em edição, se o layout do modificador ainda não existe, copia o padrão para posicionar.
+        if self._edit_mode and self._profile is not None and name != DEFAULT_LAYOUT_KEY:
+            self._profile.overlay.ensure_layout(name)
+        self._rebuild_slots()
+        self._place_banner()
+
+    def current_layout_key(self) -> str:
+        return self._layout_key
 
     def set_edit_mode(self, enabled: bool) -> None:
+        if self._edit_mode and not enabled and self._layout_dirty:
+            self.sync_slots_to_profile()
+            self._layout_dirty = False
         self._edit_mode = enabled
         if enabled and self._profile is not None:
             self._profile.overlay.visible = True
+            if self._layout_key != DEFAULT_LAYOUT_KEY:
+                self._profile.overlay.ensure_layout(self._layout_key)
             self.show()
+            self._rebuild_slots()
         for widget in self._slots:
             widget.set_edit_mode(enabled)
         self._banner.setVisible(enabled)
@@ -200,14 +220,18 @@ class OverlayWindow(QWidget):
             return
         self.show()
         self._cover_selected_screen()
+        size = self._profile.overlay.item_size
+        slots = list(self._profile.overlay.slots_for(self._layout_key))
         slot = OverlaySlot(
             button=button,
-            x=max(20, (self.width() - 44) // 2),
+            x=max(20, (self.width() - size) // 2),
             y=max(20, self.height() - 140),
-            size=44,
-            id=f"slot{len(self._profile.overlay.slots) + 1}",
+            size=size,
+            id=f"slot{len(slots) + 1}",
         )
-        self._profile.overlay.slots.append(slot)
+        slots.append(slot)
+        self._profile.overlay.set_slots_for(self._layout_key, slots)
+        self._layout_dirty = False
         self._rebuild_slots()
         self.slots_changed.emit()
 
@@ -215,17 +239,18 @@ class OverlayWindow(QWidget):
         if self._profile is None:
             return
         updated: list[OverlaySlot] = []
+        item_size = self._profile.overlay.item_size
         for widget in self._slots:
             updated.append(
                 OverlaySlot(
                     button=widget.button,
                     x=widget.x(),
                     y=widget.y(),
-                    size=widget.slot_size,
+                    size=item_size,
                     id="",
                 )
             )
-        self._profile.overlay.slots = updated
+        self._profile.overlay.set_slots_for(self._layout_key, updated)
 
     def _rebuild_slots(self) -> None:
         for widget in self._slots:
@@ -233,19 +258,30 @@ class OverlayWindow(QWidget):
         self._slots.clear()
         if self._profile is None:
             return
-        for slot in self._profile.overlay.slots:
-            widget = OverlaySlotWidget(slot.button, slot.size, self)
+        size = self._profile.overlay.item_size
+        for slot in self._profile.overlay.slots_for(self._layout_key):
+            widget = OverlaySlotWidget(slot.button, size, self)
             widget.move(slot.x, slot.y)
             widget.set_theme(self._overlay_theme())
             widget.set_edit_mode(self._edit_mode)
-            widget.set_layer_badge(self._layer_badge)
             widget.moved.connect(self._on_slots_mutated)
-            widget.resized.connect(self._on_slots_mutated)
+            widget.resized.connect(lambda w=widget: self._on_slot_resized(w))
             widget.remove_requested.connect(lambda w=widget: self._remove_slot(w))
             widget.show()
             self._slots.append(widget)
-        self._refresh_captions()
         self._clamp_slots()
+
+    def _on_slot_resized(self, widget: OverlaySlotWidget) -> None:
+        size = widget.slot_size
+        if self._profile is not None:
+            self._profile.overlay.item_size = size
+        for other in self._slots:
+            if other is widget:
+                continue
+            if other.slot_size != size:
+                other.slot_size = size
+                other._apply_size()
+        self._on_slots_mutated()
 
     def _clamp_slots(self) -> None:
         for widget in self._slots:
@@ -263,7 +299,9 @@ class OverlayWindow(QWidget):
             self._on_slots_mutated()
 
     def _on_slots_mutated(self) -> None:
+        self._layout_dirty = True
         self.sync_slots_to_profile()
+        self._layout_dirty = False
         self.slots_changed.emit()
 
     def _overlay_theme(self):
@@ -273,15 +311,6 @@ class OverlayWindow(QWidget):
     def _apply_theme_styles(self) -> None:
         self._banner.setStyleSheet(self._overlay_theme().banner_qss)
 
-    def _refresh_captions(self, captions: dict[str, str] | None = None) -> None:
-        captions = captions or {}
-        for widget in self._slots:
-            if captions:
-                widget.set_caption(captions.get(widget.button, ""))
-                continue
-            mapping = self._profile.button_map(widget.button) if self._profile else None
-            widget.set_caption(mapping.preview_action().label() if mapping else "")
-
     def _apply_click_through(self, enabled: bool) -> None:
         hwnd = int(self.winId())
         if hwnd:
@@ -289,9 +318,10 @@ class OverlayWindow(QWidget):
 
     def _place_banner(self) -> None:
         screen = self._target_screen()
+        layout = "Padrão" if self._layout_key == DEFAULT_LAYOUT_KEY else self._layout_key
         self._banner.setText(
-            "Modo edição — arraste os ícones nesta tela "
-            f"({_screen_label(screen)}) • scroll no tamanho • botão direito remove • F8 sai"
+            f"Edição [{layout}] — arraste nesta tela ({_screen_label(screen)}) "
+            "• scroll no tamanho • botão direito remove • F8 sai"
         )
         self._banner.adjustSize()
         self._banner.move(max(20, (self.width() - self._banner.width()) // 2), 24)

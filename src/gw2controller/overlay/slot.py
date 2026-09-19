@@ -1,14 +1,36 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen, QWheelEvent
+from PySide6.QtGui import QFont, QMouseEvent, QPainter, QPaintEvent, QPen, QWheelEvent
 from PySide6.QtWidgets import QWidget
 
-from gw2controller.overlay.glyphs import glyph_pixmap
 from gw2controller.overlay.theme import OverlayTheme, overlay_theme
 
-MIN_SIZE = 28
+MIN_SIZE = 20
 MAX_SIZE = 96
+
+OVERLAY_LABELS: dict[str, str] = {
+    "A": "A",
+    "B": "B",
+    "X": "X",
+    "Y": "Y",
+    "LB": "LB",
+    "RB": "RB",
+    "LT": "LT",
+    "RT": "RT",
+    "LS": "LS",
+    "RS": "RS",
+    "DPAD_UP": "↑",
+    "DPAD_DOWN": "↓",
+    "DPAD_LEFT": "←",
+    "DPAD_RIGHT": "→",
+    "VIEW": "View",
+    "MENU": "Menu",
+}
+
+
+def overlay_button_label(button: str) -> str:
+    return OVERLAY_LABELS.get(button, button)
 
 
 class OverlaySlotWidget(QWidget):
@@ -21,8 +43,6 @@ class OverlaySlotWidget(QWidget):
         self.button = button
         self.slot_size = size
         self.edit_mode = False
-        self.layer_badge: str | None = None
-        self.caption = ""
         self.theme: OverlayTheme = overlay_theme("dark")
         self._drag_offset = QPoint()
         self._dragging = False
@@ -39,20 +59,10 @@ class OverlaySlotWidget(QWidget):
         self.setCursor(Qt.CursorShape.SizeAllCursor if enabled else Qt.CursorShape.ArrowCursor)
         self.update()
 
-    def set_layer_badge(self, badge: str | None) -> None:
-        if badge != self.layer_badge:
-            self.layer_badge = badge
-            self.update()
-
     def set_theme(self, theme: OverlayTheme | str) -> None:
         resolved = theme if isinstance(theme, OverlayTheme) else overlay_theme(theme)
         if resolved.name != self.theme.name:
             self.theme = resolved
-            self.update()
-
-    def set_caption(self, caption: str) -> None:
-        if caption != self.caption:
-            self.caption = caption
             self.update()
 
     def set_slot_size(self, size: int) -> None:
@@ -63,27 +73,30 @@ class OverlaySlotWidget(QWidget):
             self.resized.emit()
 
     def _apply_size(self) -> None:
-        self.setFixedSize(self.slot_size, self.slot_size + 16)
+        self.setFixedSize(self.slot_size + 8, self.slot_size + 4)
         self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:  # noqa: ARG002
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        label = overlay_button_label(self.button)
+        box = self.rect().adjusted(1, 1, -1, -1)
+
         if self.edit_mode:
             painter.setPen(QPen(self.theme.edit_border, 1, Qt.PenStyle.DashLine))
             painter.setBrush(self.theme.edit_fill)
-            painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 8, 8)
-        pixmap = glyph_pixmap(self.button, self.slot_size, self.layer_badge, theme=self.theme)
-        painter.drawPixmap(0, 0, pixmap)
-        if self.caption:
-            text_rect = self.rect().adjusted(2, self.slot_size - 2, -2, -1)
-            painter.setBrush(self.theme.caption_bg)
-            painter.setPen(QPen(self.theme.caption_border, 1))
-            painter.drawRoundedRect(text_rect, 4, 4)
-            painter.setPen(self.theme.caption_fg)
-            font = QFont("Segoe UI", max(7, self.slot_size // 5), QFont.Weight.DemiBold)
-            painter.setFont(font)
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, self.caption)
+            painter.drawRoundedRect(box, 8, 8)
+
+        painter.setBrush(self.theme.glyph_bg)
+        painter.setPen(QPen(self.theme.glyph_border, 1))
+        painter.drawRoundedRect(box, 8, 8)
+
+        painter.setPen(self.theme.glyph_fg)
+        font_size = max(9, int(self.slot_size * 0.42))
+        if len(label) > 2:
+            font_size = max(8, int(self.slot_size * 0.28))
+        painter.setFont(QFont("Segoe UI", font_size, QFont.Weight.Bold))
+        painter.drawText(box, Qt.AlignmentFlag.AlignCenter, label)
         painter.end()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:

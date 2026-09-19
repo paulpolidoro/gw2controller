@@ -53,7 +53,10 @@
         ]
       },
       "long": {
-        "type": "none"
+        "type": "keys",
+        "keys": [
+          "f"
+        ]
       }
     },
     "LT": {
@@ -127,33 +130,27 @@
       }
     },
     "LS": {
-      "mode": "short_long",
-      "short": {
+      "mode": "press",
+      "press": {
         "type": "keys",
         "keys": [
           "mouse_left"
         ]
       },
-      "long": {
+      "release": {
+        "type": "none"
+      }
+    },
+    "RS": {
+      "mode": "press",
+      "press": {
         "type": "keys",
         "keys": [
           "mouse_right"
         ]
-      }
-    },
-    "RS": {
-      "mode": "short_long",
-      "short": {
-        "type": "keys",
-        "keys": [
-          "f"
-        ]
       },
-      "long": {
-        "type": "keys",
-        "keys": [
-          "j"
-        ]
+      "release": {
+        "type": "none"
       }
     },
     "DPAD_UP": {
@@ -216,7 +213,7 @@
       "press": {
         "type": "keys",
         "keys": [
-          "i"
+          "j"
         ]
       },
       "release": {
@@ -224,15 +221,18 @@
       }
     },
     "DPAD_LEFT": {
-      "mode": "press",
-      "press": {
+      "mode": "short_long",
+      "short": {
+        "type": "keys",
+        "keys": [
+          "i"
+        ]
+      },
+      "long": {
         "type": "keys",
         "keys": [
           "h"
         ]
-      },
-      "release": {
-        "type": "none"
       }
     },
     "DPAD_RIGHT": {
@@ -248,8 +248,11 @@
             ]
           },
           {
-            "label": "",
-            "keys": []
+            "label": "HOME",
+            "keys": [
+              "ctrl",
+              "num2"
+            ]
           },
           {
             "label": "",
@@ -294,15 +297,18 @@
       }
     },
     "MENU": {
-      "mode": "press",
-      "press": {
+      "mode": "short_long",
+      "short": {
         "type": "keys",
         "keys": [
           "escape"
         ]
       },
-      "release": {
-        "type": "none"
+      "long": {
+        "type": "keys",
+        "keys": [
+          "enter"
+        ]
       }
     },
     "LB": {
@@ -388,15 +394,178 @@
     "screen_index": -1,
     "theme": "dark",
     "radial_alpha": 66,
+    "item_size": 26,
     "slots": [
       {
+        "button": "RB",
+        "x": 644,
+        "y": 988,
+        "size": 26,
+        "id": ""
+      },
+      {
         "button": "X",
-        "x": 925,
-        "y": 797,
-        "size": 44,
+        "x": 1011,
+        "y": 986,
+        "size": 26,
+        "id": ""
+      },
+      {
+        "button": "DPAD_UP",
+        "x": 1313,
+        "y": 1010,
+        "size": 26,
+        "id": ""
+      },
+      {
+        "button": "Y",
+        "x": 576,
+        "y": 1011,
+        "size": 26,
+        "id": ""
+      },
+      {
+        "button": "B",
+        "x": 947,
+        "y": 920,
+        "size": 26,
         "id": ""
       }
-    ]
+    ],
+    "layouts": {
+      "RT": [
+        {
+          "button": "X",
+          "x": 759,
+          "y": 989,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "A",
+          "x": 706,
+          "y": 990,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "B",
+          "x": 813,
+          "y": 988,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "Y",
+          "x": 868,
+          "y": 987,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "RB",
+          "x": 646,
+          "y": 988,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "DPAD_UP",
+          "x": 1316,
+          "y": 1013,
+          "size": 26,
+          "id": ""
+        }
+      ],
+      "LT": [
+        {
+          "button": "RB",
+          "x": 644,
+          "y": 988,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "X",
+          "x": 1123,
+          "y": 989,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "DPAD_UP",
+          "x": 1313,
+          "y": 1010,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "B",
+          "x": 1178,
+          "y": 988,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "A",
+          "x": 1067,
+          "y": 991,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "Y",
+          "x": 1233,
+          "y": 991,
+          "size": 26,
+          "id": ""
+        }
+      ],
+      "LB": [
+        {
+          "button": "RB",
+          "x": 644,
+          "y": 988,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "DPAD_UP",
+          "x": 1313,
+          "y": 1010,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "A",
+          "x": 646,
+          "y": 914,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "X",
+          "x": 683,
+          "y": 914,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "B",
+          "x": 724,
+          "y": 914,
+          "size": 26,
+          "id": ""
+        },
+        {
+          "button": "Y",
+          "x": 774,
+          "y": 915,
+          "size": 26,
+          "id": ""
+        }
+      ]
+    }
   },
   "context_layers": {
     "map_open": {
@@ -431,7 +600,40 @@
         ]
       }
     },
-    "chat": {},
-    "mounted": {}
+    "chat": {
+      "B": {
+        "type": "keys",
+        "keys": [
+          "escape"
+        ]
+      },
+      "RB": {
+        "type": "keys",
+        "keys": [
+          "tab"
+        ]
+      },
+      "LB": {
+        "type": "keys",
+        "keys": [
+          "shift",
+          "tab"
+        ]
+      }
+    },
+    "mounted": {
+      "B": {
+        "type": "keys",
+        "keys": [
+          "c"
+        ]
+      },
+      "Y": {
+        "type": "keys",
+        "keys": [
+          "v"
+        ]
+      }
+    }
   }
 }

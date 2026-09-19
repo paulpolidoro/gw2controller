@@ -34,7 +34,7 @@ from gw2controller.controller.xinput import (
     BUTTON_LABELS,
     PadState,
 )
-from gw2controller.mapping.models import Action, Profile
+from gw2controller.mapping.models import DEFAULT_LAYOUT_KEY, Action, Profile
 from gw2controller.mapping.profiles import list_profiles, load_profile, save_profile
 from gw2controller.overlay.glyphs import app_icon_pixmap
 from gw2controller.overlay.window import screen_choices
@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
     overlay_edit_toggled = Signal()
     overlay_visibility_toggled = Signal()
     overlay_add_slot = Signal(str)
+    overlay_layout_selected = Signal(str)
     profile_changed = Signal()
     profile_persisted = Signal()
 
@@ -85,6 +86,9 @@ class MainWindow(QMainWindow):
         self._overlay_theme = QComboBox()
         self._radial_alpha = QSlider(Qt.Orientation.Horizontal)
         self._radial_alpha_label = QLabel()
+        self._item_size = QSlider(Qt.Orientation.Horizontal)
+        self._item_size_label = QLabel()
+        self._overlay_layout = QComboBox()
 
         self._build()
         self._build_menu()
@@ -218,7 +222,7 @@ class MainWindow(QMainWindow):
 
     def _build_overlay_tab(self) -> QWidget:
         self._slot_button.addItems(ALL_BUTTONS)
-        add_btn = QPushButton("Adicionar ícone")
+        add_btn = QPushButton("Adicionar item")
         add_btn.setObjectName("primary")
         add_btn.clicked.connect(lambda: self.overlay_add_slot.emit(self._slot_button.currentText()))
         edit_btn = QPushButton("Editar posições (F8)")
@@ -233,12 +237,15 @@ class MainWindow(QMainWindow):
         self._overlay_theme.currentIndexChanged.connect(self._read_overlay_theme)
         self._radial_alpha.setRange(10, 100)
         self._radial_alpha.valueChanged.connect(self._read_radial_alpha)
+        self._item_size.setRange(20, 96)
+        self._item_size.valueChanged.connect(self._read_item_size)
+        self._overlay_layout.currentIndexChanged.connect(self._read_overlay_layout)
 
         hint = QLabel(
-            "O overlay fica só na tela escolhida — assim o arraste não quebra com dois monitores. "
-            "No modo edição, arraste os ícones para cima das skills. "
-            "O jogo precisa estar em janela ou borderless nessa mesma tela. "
-            "O tema e o alpha valem só para os overlays (ícones e radial), não para esta janela."
+            "O overlay mostra só o nome do botão (X, RB…). "
+            "Salve posições por layout: Padrão ou cada modificadora (LB, RB…). "
+            "Em jogo, segurar o modificador troca o layout automaticamente. "
+            "No modo edição, escolha o layout abaixo para posicionar."
         )
         hint.setWordWrap(True)
 
@@ -250,10 +257,19 @@ class MainWindow(QMainWindow):
         theme_row.addWidget(QLabel("Tema do overlay"))
         theme_row.addWidget(self._overlay_theme, 1)
 
+        layout_row = QHBoxLayout()
+        layout_row.addWidget(QLabel("Layout (modificador)"))
+        layout_row.addWidget(self._overlay_layout, 1)
+
         alpha_row = QHBoxLayout()
         alpha_row.addWidget(QLabel("Alpha do radial"))
         alpha_row.addWidget(self._radial_alpha, 1)
         alpha_row.addWidget(self._radial_alpha_label)
+
+        size_row = QHBoxLayout()
+        size_row.addWidget(QLabel("Tamanho dos itens"))
+        size_row.addWidget(self._item_size, 1)
+        size_row.addWidget(self._item_size_label)
 
         row = QHBoxLayout()
         row.addWidget(QLabel("Botão"))
@@ -267,6 +283,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._overlay_visible)
         layout.addLayout(screen_row)
         layout.addLayout(theme_row)
+        layout.addLayout(layout_row)
+        layout.addLayout(size_row)
         layout.addLayout(alpha_row)
         layout.addLayout(row)
         layout.addWidget(hint)
@@ -318,6 +336,8 @@ class MainWindow(QMainWindow):
         self._refresh_screen_choices()
         self._refresh_overlay_theme()
         self._refresh_radial_alpha()
+        self._refresh_item_size()
+        self._refresh_overlay_layout()
         self._map_open_tab.overrides = self.profile.context_layers.map_open
         self._chat_tab.overrides = self.profile.context_layers.chat
         self._mounted_tab.overrides = self.profile.context_layers.mounted
@@ -431,6 +451,7 @@ class MainWindow(QMainWindow):
         self.profile.set_button_map(button, mapping)
         self._rebuild_table()
         self._sync_modifier_tabs()
+        self._refresh_overlay_layout()
         self.profile_changed.emit()
 
     def _edit_action(self, button: str, slot: str) -> None:
@@ -450,6 +471,7 @@ class MainWindow(QMainWindow):
         self.profile.set_button_map(button, mapping)
         self._rebuild_table()
         self._sync_modifier_tabs()
+        self._refresh_overlay_layout()
         self.profile_changed.emit()
 
     def _sync_modifier_tabs(self) -> None:
@@ -574,3 +596,44 @@ class MainWindow(QMainWindow):
         self.profile.overlay.radial_alpha = int(value)
         self._radial_alpha_label.setText(f"{value}%")
         self.profile_changed.emit()
+
+    def _refresh_item_size(self) -> None:
+        self._item_size.blockSignals(True)
+        self._item_size.setValue(self.profile.overlay.item_size)
+        self._item_size.blockSignals(False)
+        self._item_size_label.setText(f"{self.profile.overlay.item_size}px")
+
+    def _read_item_size(self, value: int) -> None:
+        size = int(value)
+        self.profile.overlay.item_size = size
+        for slot in self.profile.overlay.slots:
+            slot.size = size
+        for slots in self.profile.overlay.layouts.values():
+            for slot in slots:
+                slot.size = size
+        self._item_size_label.setText(f"{size}px")
+        self.profile_changed.emit()
+
+    def _refresh_overlay_layout(self) -> None:
+        current = self._overlay_layout.currentData()
+        self._overlay_layout.blockSignals(True)
+        self._overlay_layout.clear()
+        self._overlay_layout.addItem("Padrão", DEFAULT_LAYOUT_KEY)
+        for button, _slot in self.profile.modifier_sources():
+            label = BUTTON_LABELS.get(button, button)
+            if self._overlay_layout.findData(button) < 0:
+                self._overlay_layout.addItem(f"Mod {label}", button)
+        for key in self.profile.overlay.layout_keys():
+            if key == DEFAULT_LAYOUT_KEY:
+                continue
+            if self._overlay_layout.findData(key) < 0:
+                self._overlay_layout.addItem(key, key)
+        found = self._overlay_layout.findData(current if current else DEFAULT_LAYOUT_KEY)
+        self._overlay_layout.setCurrentIndex(found if found >= 0 else 0)
+        self._overlay_layout.blockSignals(False)
+
+    def _read_overlay_layout(self) -> None:
+        data = self._overlay_layout.currentData()
+        if data is None:
+            return
+        self.overlay_layout_selected.emit(str(data))
