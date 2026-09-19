@@ -4,9 +4,9 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QFont, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QWidget
 
-from macrocontroller.mapping.engine import RadialView
-from macrocontroller.overlay.theme import OverlayTheme, overlay_theme
-from macrocontroller.overlay.window import (
+from gw2controller.mapping.engine import RadialView
+from gw2controller.overlay.theme import OverlayTheme, overlay_theme
+from gw2controller.overlay.window import (
     SWP_NOACTIVATE,
     SWP_NOMOVE,
     SWP_NOSIZE,

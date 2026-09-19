@@ -29,18 +29,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from macrocontroller.controller.xinput import (
+from gw2controller.controller.xinput import (
     ALL_BUTTONS,
     BUTTON_LABELS,
     PadState,
 )
-from macrocontroller.mapping.models import Action, Profile
-from macrocontroller.mapping.profiles import list_profiles, load_profile, save_profile
-from macrocontroller.overlay.glyphs import app_icon_pixmap
-from macrocontroller.overlay.window import screen_choices
-from macrocontroller.paths import PROFILES_DIR
-from macrocontroller.ui.binding_dialog import FunctionDialog, ModifierTab
-from macrocontroller.ui.gamepad_view import GamepadView
+from gw2controller.mapping.models import Action, Profile
+from gw2controller.mapping.profiles import list_profiles, load_profile, save_profile
+from gw2controller.overlay.glyphs import app_icon_pixmap
+from gw2controller.overlay.window import screen_choices
+from gw2controller.paths import PROFILES_DIR
+from gw2controller.ui.binding_dialog import FunctionDialog, ModifierTab, OverrideLayerTab
+from gw2controller.ui.gamepad_view import GamepadView
+from gw2controller.gw2.mumble import MumbleState
 
 
 class MainWindow(QMainWindow):
@@ -54,7 +55,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.profile = profile
         self.profile_path = profile_path
-        self.setWindowTitle("Macrocontroller")
+        self.setWindowTitle("GW2Controller")
         self.setWindowIcon(QIcon(app_icon_pixmap(32)))
         self.resize(1040, 720)
 
@@ -63,6 +64,7 @@ class MainWindow(QMainWindow):
         self._profile_combo = QComboBox()
         self._status = QLabel("Procurando controle Xbox…")
         self._layer_label = QLabel("Modificadores: Padrão")
+        self._mumble_label = QLabel("Mumble: off")
         self._table = QTableWidget(0, 4)
         self._tabs = QTabWidget()
         self._modifier_tabs: dict[tuple[str, str], ModifierTab] = {}
@@ -107,10 +109,32 @@ class MainWindow(QMainWindow):
         info = QHBoxLayout()
         info.addWidget(self._status)
         info.addStretch()
+        info.addWidget(self._mumble_label)
         info.addWidget(self._layer_label)
 
         self._tabs.addTab(self._build_buttons_tab(), "Botões")
         self._tabs.addTab(self._build_sticks_tab(), "Analógicos")
+        self._map_open_tab = OverrideLayerTab(
+            "Quando o mapa do mundo (M) estiver aberto. "
+            "Vazio = mantém a função base. Prioridade: modificador > mapa > chat > montado > base.",
+            self.profile.context_layers.map_open,
+        )
+        self._chat_tab = OverrideLayerTab(
+            "Quando o chat/textbox do jogo estiver focado. "
+            "Vazio = mantém a função base.",
+            self.profile.context_layers.chat,
+        )
+        self._mounted_tab = OverrideLayerTab(
+            "Quando estiver montado (mountIndex ≠ 0). "
+            "Vazio = mantém a função base.",
+            self.profile.context_layers.mounted,
+        )
+        self._map_open_tab.changed.connect(self._on_context_layer_changed)
+        self._chat_tab.changed.connect(self._on_context_layer_changed)
+        self._mounted_tab.changed.connect(self._on_context_layer_changed)
+        self._tabs.addTab(self._map_open_tab, "Map open")
+        self._tabs.addTab(self._chat_tab, "Chat")
+        self._tabs.addTab(self._mounted_tab, "Mounted")
         self._tabs.addTab(self._build_overlay_tab(), "Overlay")
         self._tabs.addTab(self._build_options_tab(), "Opções")
 
@@ -294,6 +318,12 @@ class MainWindow(QMainWindow):
         self._refresh_screen_choices()
         self._refresh_overlay_theme()
         self._refresh_radial_alpha()
+        self._map_open_tab.overrides = self.profile.context_layers.map_open
+        self._chat_tab.overrides = self.profile.context_layers.chat
+        self._mounted_tab.overrides = self.profile.context_layers.mounted
+        self._map_open_tab.reload()
+        self._chat_tab.reload()
+        self._mounted_tab.reload()
 
     def refresh_profile_list(self) -> None:
         self._profile_combo.blockSignals(True)
@@ -308,14 +338,22 @@ class MainWindow(QMainWindow):
             self._profile_combo.setCurrentIndex(index)
         self._profile_combo.blockSignals(False)
 
-    def set_pad_state(self, pad: PadState, layer: str) -> None:
+    def set_pad_state(self, pad: PadState, layer: str, mumble: MumbleState | None = None) -> None:
         self._gamepad.set_pad(pad)
         self._gamepad.set_layer(layer)
         if pad.connected:
             self._status.setText("Controle Xbox conectado")
         else:
             self._status.setText("Nenhum controle Xbox no slot 0")
-        self._layer_label.setText(f"Modificadores: {layer}")
+        self._layer_label.setText(f"Camada: {layer}")
+        if mumble is not None:
+            self._mumble_label.setText(mumble.status_label())
+
+    def _on_context_layer_changed(self) -> None:
+        self.profile.context_layers.map_open = self._map_open_tab.overrides
+        self.profile.context_layers.chat = self._chat_tab.overrides
+        self.profile.context_layers.mounted = self._mounted_tab.overrides
+        self.profile_changed.emit()
 
     def save_current(self) -> None:
         self.profile.name = self._name.text().strip() or self.profile.name

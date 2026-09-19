@@ -4,8 +4,8 @@ from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
-from macrocontroller.controller.xinput import PadState
-from macrocontroller.overlay.glyphs import FACE_COLORS
+from gw2controller.controller.xinput import PadState
+from gw2controller.overlay.glyphs import FACE_COLORS
 
 
 class GamepadView(QWidget):

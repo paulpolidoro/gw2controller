@@ -384,18 +384,54 @@
     }
   },
   "overlay": {
-    "visible": false,
+    "visible": true,
     "screen_index": -1,
     "theme": "dark",
     "radial_alpha": 66,
     "slots": [
       {
         "button": "X",
-        "x": 938,
-        "y": 940,
+        "x": 925,
+        "y": 797,
         "size": 44,
-        "id": "slot1"
+        "id": ""
       }
     ]
+  },
+  "context_layers": {
+    "map_open": {
+      "B": {
+        "type": "keys",
+        "keys": [
+          "escape"
+        ]
+      },
+      "LT": {
+        "type": "keys",
+        "keys": [
+          "-"
+        ]
+      },
+      "RT": {
+        "type": "keys",
+        "keys": [
+          "="
+        ]
+      },
+      "RB": {
+        "type": "keys",
+        "keys": [
+          "mouse_left"
+        ]
+      },
+      "LB": {
+        "type": "keys",
+        "keys": [
+          "mouse_right"
+        ]
+      }
+    },
+    "chat": {},
+    "mounted": {}
   }
 }

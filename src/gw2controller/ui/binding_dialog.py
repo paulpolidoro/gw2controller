@@ -19,9 +19,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from macrocontroller.controller.xinput import ALL_BUTTONS, BUTTON_LABELS
-from macrocontroller.mapping.models import MAX_RADIAL_ITEMS, Action, RadialItem
-from macrocontroller.output.sendinput import (
+from gw2controller.controller.xinput import ALL_BUTTONS, BUTTON_LABELS
+from gw2controller.mapping.models import MAX_RADIAL_ITEMS, Action, RadialItem
+from gw2controller.output.sendinput import (
     key_display_name,
     key_name_from_native_vk,
     normalize_key_name,
@@ -311,10 +311,40 @@ class ModifierTab(QWidget):
         super().__init__(parent)
         self.owner_button = owner_button
         self.action = action
-        hint = QLabel(
-            f"Overrides de {BUTTON_LABELS.get(owner_button, owner_button)}. "
-            "Vazio = mantém a função base do botão."
+        self._layer = OverrideLayerTab(
+            title_hint=(
+                f"Overrides de {BUTTON_LABELS.get(owner_button, owner_button)}. "
+                "Vazio = mantém a função base do botão."
+            ),
+            overrides=action.overrides,
+            exclude_button=owner_button,
+            parent=self,
         )
+        self._layer.changed.connect(self.changed.emit)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._layer)
+
+    def reload(self) -> None:
+        self._layer.overrides = self.action.overrides
+        self._layer.reload()
+
+
+class OverrideLayerTab(QWidget):
+    changed = Signal()
+
+    def __init__(
+        self,
+        title_hint: str,
+        overrides: dict[str, Action],
+        parent: QWidget | None = None,
+        *,
+        exclude_button: str | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.overrides = overrides
+        self._exclude = exclude_button
+        hint = QLabel(title_hint)
         hint.setWordWrap(True)
         self._table = QTableWidget(0, 3)
         self._table.setHorizontalHeaderLabels(["Botão", "Teclas", ""])
@@ -327,13 +357,13 @@ class ModifierTab(QWidget):
         self.reload()
 
     def reload(self) -> None:
-        others = [button for button in ALL_BUTTONS if button != self.owner_button]
-        self._table.setRowCount(len(others))
-        for row, button in enumerate(others):
+        buttons = [button for button in ALL_BUTTONS if button != self._exclude]
+        self._table.setRowCount(len(buttons))
+        for row, button in enumerate(buttons):
             label = QTableWidgetItem(BUTTON_LABELS.get(button, button))
             label.setFlags(label.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._table.setItem(row, 0, label)
-            override = self.action.overrides.get(button, Action())
+            override = self.overrides.get(button, Action())
             current = QTableWidgetItem(override.label() if override.is_active() else "Função base")
             current.setFlags(current.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._table.setItem(row, 1, current)
@@ -349,22 +379,20 @@ class ModifierTab(QWidget):
             self._table.setCellWidget(row, 2, cell)
 
     def _edit(self, button: str) -> None:
-        current = self.action.overrides.get(button, Action())
+        current = self.overrides.get(button, Action())
         if current.type not in ("keys", "none"):
             current = Action(type="keys", keys=current.keys)
-        dialog = FunctionDialog(current if current.type == "keys" else Action(type="keys"), self)
-        dialog._modifier.setEnabled(False)
-        dialog._radial.setEnabled(False)
+        dialog = FunctionDialog(current if current.type == "keys" else Action(type="keys"), self, keys_only=True)
         if dialog.exec():
             result = dialog.result_action()
             if result.type == "keys" and result.is_active():
-                self.action.overrides[button] = result
+                self.overrides[button] = result
             else:
-                self.action.overrides.pop(button, None)
+                self.overrides.pop(button, None)
             self.reload()
             self.changed.emit()
 
     def _clear(self, button: str) -> None:
-        self.action.overrides.pop(button, None)
+        self.overrides.pop(button, None)
         self.reload()
         self.changed.emit()

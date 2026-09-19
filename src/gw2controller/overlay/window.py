@@ -7,9 +7,9 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPaintEvent, QScreen
 from PySide6.QtWidgets import QLabel, QWidget
 
-from macrocontroller.mapping.models import OverlaySlot, Profile
-from macrocontroller.overlay.slot import OverlaySlotWidget
-from macrocontroller.overlay.theme import overlay_theme
+from gw2controller.mapping.models import OverlaySlot, Profile
+from gw2controller.overlay.slot import OverlaySlotWidget
+from gw2controller.overlay.theme import overlay_theme
 
 GWL_EXSTYLE = -20
 WS_EX_LAYERED = 0x00080000
@@ -85,7 +85,7 @@ class OverlayWindow(QWidget):
 
     def __init__(self) -> None:
         super().__init__(None)
-        self.setWindowTitle("Macrocontroller Overlay")
+        self.setWindowTitle("GW2Controller Overlay")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint

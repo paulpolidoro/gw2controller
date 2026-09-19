@@ -24,7 +24,7 @@ def ordered_keys(keys: list[str]) -> list[str]:
 
 
 def keys_label(keys: list[str]) -> str:
-    from macrocontroller.output.sendinput import key_display_name
+    from gw2controller.output.sendinput import key_display_name
 
     names = [key_display_name(key) for key in ordered_keys(keys)]
     return "+".join(names) if names else "—"
@@ -285,13 +285,55 @@ class HotkeysConfig:
         )
 
 
+def _overrides_from_dict(data: dict[str, Any] | None) -> dict[str, Action]:
+    data = data or {}
+    result: dict[str, Action] = {}
+    for button, payload in data.items():
+        action = Action.from_dict(payload)
+        if action.is_active():
+            result[str(button)] = action
+    return result
+
+
+def _overrides_to_dict(overrides: dict[str, Action]) -> dict[str, Any]:
+    return {
+        button: action.to_dict()
+        for button, action in overrides.items()
+        if action.is_active()
+    }
+
+
+@dataclass
+class ContextLayers:
+    map_open: dict[str, Action] = field(default_factory=dict)
+    chat: dict[str, Action] = field(default_factory=dict)
+    mounted: dict[str, Action] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> ContextLayers:
+        data = data or {}
+        return cls(
+            map_open=_overrides_from_dict(data.get("map_open")),
+            chat=_overrides_from_dict(data.get("chat")),
+            mounted=_overrides_from_dict(data.get("mounted")),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "map_open": _overrides_to_dict(self.map_open),
+            "chat": _overrides_to_dict(self.chat),
+            "mounted": _overrides_to_dict(self.mounted),
+        }
+
+
 @dataclass
 class Profile:
-    name: str = "MMORPG Default"
+    name: str = "GW2 Default"
     buttons: dict[str, ButtonMap] = field(default_factory=dict)
     sticks: dict[str, StickConfig] = field(default_factory=dict)
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
     hotkeys: HotkeysConfig = field(default_factory=HotkeysConfig)
+    context_layers: ContextLayers = field(default_factory=ContextLayers)
     trigger_threshold: float = 0.5
     long_press_ms: int = 350
     radial_deadzone: float = 0.35
@@ -333,6 +375,7 @@ class Profile:
                 "radial_alpha": self.overlay.radial_alpha,
                 "slots": [asdict(slot) for slot in self.overlay.slots],
             },
+            "context_layers": self.context_layers.to_dict(),
         }
 
     @classmethod
@@ -353,6 +396,7 @@ class Profile:
             sticks=sticks,
             overlay=OverlayConfig.from_dict(data.get("overlay")),
             hotkeys=HotkeysConfig.from_dict(data.get("hotkeys")),
+            context_layers=ContextLayers.from_dict(data.get("context_layers")),
             trigger_threshold=float(data.get("trigger_threshold", 0.5)),
             long_press_ms=int(data.get("long_press_ms", data.get("sticky_ms", 350))),
             radial_deadzone=float(data.get("radial_deadzone", 0.35)),

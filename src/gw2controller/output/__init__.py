@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from macrocontroller.output.sendinput import InputSender
+from gw2controller.output.sendinput import InputSender
 
 __all__ = ["InputSender"]

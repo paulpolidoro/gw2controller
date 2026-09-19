@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 from math import atan2, hypot, tau
 from typing import Literal
 
-from macrocontroller.controller.xinput import ALL_BUTTONS, PadState
-from macrocontroller.mapping.models import Action, Profile, RadialItem, ordered_keys
+from gw2controller.controller.xinput import ALL_BUTTONS, PadState
+from gw2controller.gw2.mumble import MumbleState
+from gw2controller.mapping.models import Action, Profile, RadialItem, ordered_keys
 
 EventKind = Literal["key_down", "key_up", "mouse_down", "mouse_up", "tap_key", "tap_mouse"]
 
@@ -34,6 +35,7 @@ class TickResult:
     pad: PadState = field(default_factory=PadState)
     release_all: bool = False
     radial: RadialView = field(default_factory=RadialView)
+    mumble: MumbleState = field(default_factory=MumbleState)
 
 
 def apply_radial_deadzone(x: float, y: float, deadzone: float) -> tuple[float, float]:
@@ -66,6 +68,8 @@ class MappingEngine:
         self._radial_items: list[RadialItem] = []
         self._radial_selected: int | None = None
         self._was_connected = False
+        self._mumble = MumbleState()
+        self._input_blocked = False
 
     def set_profile(self, profile: Profile) -> list[InputEvent]:
         events = self.release_held()
@@ -75,6 +79,17 @@ class MappingEngine:
         self._scheduled.clear()
         self._close_radial()
         return events
+
+    def set_mumble(self, state: MumbleState) -> list[InputEvent]:
+        was_blocked = self._input_blocked
+        self._mumble = state
+        self._input_blocked = state.input_blocked
+        if self._input_blocked and not was_blocked:
+            events = self.release_held()
+            self._scheduled.clear()
+            self._close_radial()
+            return events
+        return []
 
     def release_held(self) -> list[InputEvent]:
         events: list[InputEvent] = []
@@ -93,10 +108,37 @@ class MappingEngine:
             self._scheduled.clear()
             self._prev_buttons = {name: False for name in ALL_BUTTONS}
             self._was_connected = False
-            return TickResult("Padrão", {}, 0.0, 0.0, events, pad, release_all=True)
+            return TickResult(
+                "Padrão",
+                {},
+                0.0,
+                0.0,
+                events,
+                pad,
+                release_all=True,
+                mumble=self._mumble,
+            )
         self._was_connected = pad.connected
         if not pad.connected:
-            return TickResult("Padrão", {}, 0.0, 0.0, [], pad)
+            return TickResult("Padrão", {}, 0.0, 0.0, [], pad, mumble=self._mumble)
+
+        if self._input_blocked:
+            # Solta o que ainda estiver apertado e ignora novos inputs.
+            if any(self._active) or self._move_held or self._scheduled:
+                events.extend(self.release_held())
+                self._scheduled.clear()
+                self._close_radial()
+            self._prev_buttons = {name: bool(pad.buttons.get(name)) for name in ALL_BUTTONS}
+            return TickResult(
+                runtime_label=self._runtime_label(),
+                captions=self._captions(),
+                mouse_dx=0.0,
+                mouse_dy=0.0,
+                events=events,
+                pad=pad,
+                release_all=bool(events),
+                mumble=self._mumble,
+            )
 
         threshold = max(0.08, self.profile.long_press_ms / 1000.0)
 
@@ -130,6 +172,7 @@ class MappingEngine:
             events=events,
             pad=pad,
             radial=self._radial_view(),
+            mumble=self._mumble,
         )
 
     def _on_press(self, button: str, now_s: float) -> list[InputEvent]:
@@ -257,6 +300,19 @@ class MappingEngine:
             override = action.overrides.get(button)
             if override is not None and override.is_active():
                 return override
+        layers = self.profile.context_layers
+        if self._mumble.map_open:
+            override = layers.map_open.get(button)
+            if override is not None and override.is_active():
+                return override
+        if self._mumble.textbox_focused:
+            override = layers.chat.get(button)
+            if override is not None and override.is_active():
+                return override
+        if self._mumble.mounted:
+            override = layers.mounted.get(button)
+            if override is not None and override.is_active():
+                return override
         return None
 
     def _set_chord(self, button: str, keys: list[str]) -> list[InputEvent]:
@@ -316,9 +372,18 @@ class MappingEngine:
         return RadialView(True, items, self._radial_selected)
 
     def _runtime_label(self) -> str:
-        if not self._mod_order:
-            return "Padrão"
-        return "+".join(self._mod_order)
+        parts: list[str] = []
+        if self._mod_order:
+            parts.append("+".join(self._mod_order))
+        if self._mumble.map_open:
+            parts.append("Mapa")
+        if self._mumble.textbox_focused:
+            parts.append("Chat")
+        if self._mumble.mounted:
+            parts.append("Montado")
+        if self._input_blocked:
+            parts.append("Bloqueado")
+        return " · ".join(parts) if parts else "Padrão"
 
     def _captions(self) -> dict[str, str]:
         captions: dict[str, str] = {}
@@ -380,7 +445,7 @@ class MappingEngine:
 
 
 def keys_label_safe(keys: list[str]) -> str:
-    from macrocontroller.mapping.models import keys_label
+    from gw2controller.mapping.models import keys_label
 
     return keys_label(keys)
 

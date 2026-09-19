@@ -4,8 +4,8 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen, QWheelEvent
 from PySide6.QtWidgets import QWidget
 
-from macrocontroller.overlay.glyphs import glyph_pixmap
-from macrocontroller.overlay.theme import OverlayTheme, overlay_theme
+from gw2controller.overlay.glyphs import glyph_pixmap
+from gw2controller.overlay.theme import OverlayTheme, overlay_theme
 
 MIN_SIZE = 28
 MAX_SIZE = 96

@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 
-from macrocontroller.overlay.glyphs import app_icon_pixmap
+from gw2controller.overlay.glyphs import app_icon_pixmap
 
 
 class TrayIcon(QSystemTrayIcon):
@@ -11,7 +11,7 @@ class TrayIcon(QSystemTrayIcon):
         super().__init__(window)
         icon = QIcon(app_icon_pixmap(64))
         self.setIcon(icon)
-        self.setToolTip("Macrocontroller")
+        self.setToolTip("GW2Controller")
         menu = QMenu()
         show_action = QAction("Abrir configuração", menu)
         show_action.triggered.connect(window.showNormal)

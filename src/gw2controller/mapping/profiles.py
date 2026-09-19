@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from macrocontroller.mapping.models import Action, ButtonMap, OverlayConfig, OverlaySlot, Profile, StickConfig
-from macrocontroller.paths import PROFILES_DIR
+from gw2controller.mapping.models import Action, ButtonMap, OverlayConfig, OverlaySlot, Profile, StickConfig
+from gw2controller.paths import PROFILES_DIR
 
 
 def _keys(*names: str) -> Action:
@@ -66,7 +66,7 @@ def default_profile() -> Profile:
         ),
     }
     return Profile(
-        name="MMORPG Default",
+        name="GW2 Default",
         buttons=buttons,
         sticks={
             "left": StickConfig(mode="wasd", deadzone=0.2, sensitivity=1.0),

@@ -1,7 +1,7 @@
 [project]
-name = "macrocontroller"
+name = "gw2controller"
 version = "0.1.0"
-description = "Mapeador de controle Xbox para teclado/mouse com overlay de skills"
+description = "Mapeador de controle Xbox para Guild Wars 2 com overlay e MumbleLink"
 requires-python = ">=3.11"
 dependencies = ["PySide6>=6.6.0"]
 

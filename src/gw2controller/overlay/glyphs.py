@@ -3,8 +3,8 @@ from __future__ import annotations
 from PySide6.QtCore import QPoint, QRect, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap
 
-from macrocontroller.controller.xinput import FACE_BUTTONS
-from macrocontroller.overlay.theme import OverlayTheme, overlay_theme
+from gw2controller.controller.xinput import FACE_BUTTONS
+from gw2controller.overlay.theme import OverlayTheme, overlay_theme
 
 FACE_COLORS = {
     "A": QColor("#2ECC71"),

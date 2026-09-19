@@ -7,33 +7,35 @@ from PySide6.QtCore import QCoreApplication, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
-from macrocontroller.controller.xinput import XInputReader
-from macrocontroller.hotkeys import GlobalHotkeys, user32, vk_from_name
-from macrocontroller.mapping.engine import InputEvent, MappingEngine
-from macrocontroller.mapping.profiles import load_or_create_default, save_profile
-from macrocontroller.output.sendinput import InputSender
-from macrocontroller.overlay.glyphs import app_icon_pixmap
-from macrocontroller.overlay.radial import RadialOverlay
-from macrocontroller.overlay.window import OverlayWindow
-from macrocontroller.ui.main_window import MainWindow
-from macrocontroller.ui.styles import APP_QSS
-from macrocontroller.ui.tray import TrayIcon
+from gw2controller.controller.xinput import XInputReader
+from gw2controller.gw2.mumble import MumbleLinkReader
+from gw2controller.hotkeys import GlobalHotkeys, user32, vk_from_name
+from gw2controller.mapping.engine import InputEvent, MappingEngine
+from gw2controller.mapping.profiles import load_or_create_default, save_profile
+from gw2controller.output.sendinput import InputSender
+from gw2controller.overlay.glyphs import app_icon_pixmap
+from gw2controller.overlay.radial import RadialOverlay
+from gw2controller.overlay.window import OverlayWindow
+from gw2controller.ui.main_window import MainWindow
+from gw2controller.ui.styles import APP_QSS
+from gw2controller.ui.tray import TrayIcon
 
 HOTKEY_EDIT = 1
 HOTKEY_VISIBLE = 2
 TICK_MS = 8
 
 
-class MacroControllerApp:
+class GW2ControllerApp:
     def __init__(self) -> None:
         self.app = QApplication.instance() or QApplication(sys.argv)
-        self.app.setApplicationName("Macrocontroller")
+        self.app.setApplicationName("GW2Controller")
         self.app.setQuitOnLastWindowClosed(False)
         self.app.setStyleSheet(APP_QSS)
         self.app.setWindowIcon(QIcon(app_icon_pixmap(32)))
 
         self.profile, self.profile_path = load_or_create_default()
         self.reader = XInputReader(trigger_threshold=self.profile.trigger_threshold)
+        self.mumble = MumbleLinkReader()
         self.engine = MappingEngine(self.profile)
         self.sender = InputSender()
         self.overlay = OverlayWindow()
@@ -148,6 +150,11 @@ class MacroControllerApp:
         now = time.perf_counter()
         dt = max(0.001, min(0.05, now - self._last_tick))
         self._last_tick = now
+        mumble_state = self.mumble.read()
+        blocked_events = self.engine.set_mumble(mumble_state)
+        if blocked_events:
+            self._dispatch(blocked_events)
+            self.sender.release_all()
         pad = self.reader.read()
         result = self.engine.tick(pad, now, dt)
         if result.release_all:
@@ -173,7 +180,7 @@ class MacroControllerApp:
             self.profile.overlay.radial_alpha,
         )
         self._last_layer = result.runtime_label
-        self.window.set_pad_state(pad, result.runtime_label)
+        self.window.set_pad_state(pad, result.runtime_label, result.mumble)
 
     def _poll_fallback_hotkeys(self) -> None:
         mapping = {
@@ -210,6 +217,7 @@ class MacroControllerApp:
     def shutdown(self) -> None:
         self._timer.stop()
         self.sender.release_all()
+        self.mumble.close()
         if self._hotkeys is not None:
             self._hotkeys.unregister_all()
         save_profile(self.profile, self.profile_path)
@@ -220,7 +228,7 @@ class MacroControllerApp:
 
 def main() -> int:
     if sys.platform != "win32":
-        print("Macrocontroller roda apenas no Windows.")
+        print("GW2Controller roda apenas no Windows.")
         return 1
-    controller = MacroControllerApp()
+    controller = GW2ControllerApp()
     return controller.run()
