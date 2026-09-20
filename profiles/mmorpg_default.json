@@ -1,6 +1,7 @@
 {
   "name": "GW2 Padrão",
   "long_press_ms": 400,
+  "long_press_rumble": true,
   "radial_deadzone": 0.35,
   "trigger_threshold": 0.5,
   "hotkeys": {
@@ -29,7 +30,10 @@
         ]
       },
       "long": {
-        "type": "none"
+        "type": "keys",
+        "keys": [
+          "x"
+        ]
       }
     },
     "X": {
@@ -154,44 +158,50 @@
       }
     },
     "DPAD_UP": {
-      "mode": "press",
-      "press": {
+      "mode": "short_long",
+      "short": {
+        "type": "keys",
+        "keys": [
+          "v"
+        ]
+      },
+      "long": {
         "type": "radial",
         "radial_items": [
           {
-            "label": "SKYSCALE",
-            "keys": [
-              "num 6"
-            ]
-          },
-          {
             "label": "RAPTOR",
             "keys": [
-              "num 1"
+              "num1"
             ]
           },
           {
             "label": "SPRINGER",
             "keys": [
-              "num 2"
-            ]
-          },
-          {
-            "label": "DESMONTAR",
-            "keys": [
-              "v"
+              "num2"
             ]
           },
           {
             "label": "SKIMMER",
             "keys": [
-              "num 3"
+              "num3"
+            ]
+          },
+          {
+            "label": "JACKAL",
+            "keys": [
+              "num4"
             ]
           },
           {
             "label": "WARCLAW",
             "keys": [
-              "num 5"
+              "num5"
+            ]
+          },
+          {
+            "label": "SKYSCALE",
+            "keys": [
+              "num6"
             ]
           },
           {
@@ -203,21 +213,57 @@
             "keys": []
           }
         ]
-      },
-      "release": {
-        "type": "none"
       }
     },
     "DPAD_DOWN": {
-      "mode": "press",
-      "press": {
+      "mode": "short_long",
+      "short": {
         "type": "keys",
         "keys": [
           "j"
         ]
       },
-      "release": {
-        "type": "none"
+      "long": {
+        "type": "panel",
+        "title": "Câmera",
+        "panel_items": [
+          {
+            "label": "Zoom In",
+            "keys": [
+              "pageup"
+            ]
+          },
+          {
+            "label": "Zoom Out",
+            "keys": [
+              "pagedown"
+            ]
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          },
+          {
+            "label": "",
+            "keys": []
+          }
+        ]
       }
     },
     "DPAD_LEFT": {
@@ -238,10 +284,17 @@
     "DPAD_RIGHT": {
       "mode": "short_long",
       "short": {
+        "type": "keys",
+        "keys": [
+          "ctrl",
+          "x"
+        ]
+      },
+      "long": {
         "type": "radial",
         "radial_items": [
           {
-            "label": "RIFT SCAN",
+            "label": "SCAN RIFT",
             "keys": [
               "ctrl",
               "num1"
@@ -278,12 +331,6 @@
             "label": "",
             "keys": []
           }
-        ]
-      },
-      "long": {
-        "type": "keys",
-        "keys": [
-          "x"
         ]
       }
     },
@@ -393,45 +440,45 @@
     }
   },
   "overlay": {
-    "visible": true,
-    "screen_index": -1,
+    "visible": false,
+    "screen_index": 1,
     "theme": "dark",
-    "radial_alpha": 66,
-    "item_size": 26,
+    "radial_alpha": 60,
+    "item_size": 20,
     "slots": [
       {
         "button": "RB",
-        "x": 644,
-        "y": 988,
-        "size": 26,
+        "x": 488,
+        "y": 832,
+        "size": 20,
         "id": ""
       },
       {
         "button": "X",
-        "x": 1011,
-        "y": 986,
-        "size": 26,
+        "x": 812,
+        "y": 817,
+        "size": 20,
         "id": ""
       },
       {
         "button": "DPAD_UP",
         "x": 1313,
-        "y": 1010,
-        "size": 26,
+        "y": 834,
+        "size": 20,
         "id": ""
       },
       {
         "button": "Y",
-        "x": 576,
-        "y": 1011,
-        "size": 26,
+        "x": 420,
+        "y": 804,
+        "size": 20,
         "id": ""
       },
       {
         "button": "B",
-        "x": 947,
-        "y": 920,
-        "size": 26,
+        "x": 754,
+        "y": 726,
+        "size": 20,
         "id": ""
       }
     ],
@@ -440,43 +487,43 @@
         {
           "button": "X",
           "x": 759,
-          "y": 989,
-          "size": 26,
+          "y": 840,
+          "size": 20,
           "id": ""
         },
         {
           "button": "A",
           "x": 706,
-          "y": 990,
-          "size": 26,
+          "y": 840,
+          "size": 20,
           "id": ""
         },
         {
           "button": "B",
           "x": 813,
-          "y": 988,
-          "size": 26,
+          "y": 840,
+          "size": 20,
           "id": ""
         },
         {
           "button": "Y",
           "x": 868,
-          "y": 987,
-          "size": 26,
+          "y": 840,
+          "size": 20,
           "id": ""
         },
         {
           "button": "RB",
           "x": 646,
-          "y": 988,
-          "size": 26,
+          "y": 840,
+          "size": 20,
           "id": ""
         },
         {
           "button": "DPAD_UP",
           "x": 1316,
-          "y": 1013,
-          "size": 26,
+          "y": 840,
+          "size": 20,
           "id": ""
         }
       ],
@@ -485,42 +532,42 @@
           "button": "RB",
           "x": 644,
           "y": 988,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "X",
           "x": 1123,
           "y": 989,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "DPAD_UP",
           "x": 1313,
           "y": 1010,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "B",
           "x": 1178,
           "y": 988,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "A",
           "x": 1067,
           "y": 991,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "Y",
           "x": 1233,
           "y": 991,
-          "size": 26,
+          "size": 20,
           "id": ""
         }
       ],
@@ -529,50 +576,56 @@
           "button": "RB",
           "x": 644,
           "y": 988,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "DPAD_UP",
           "x": 1313,
           "y": 1010,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "A",
           "x": 646,
           "y": 914,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "X",
           "x": 683,
           "y": 914,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "B",
           "x": 724,
           "y": 914,
-          "size": 26,
+          "size": 20,
           "id": ""
         },
         {
           "button": "Y",
           "x": 774,
           "y": 915,
-          "size": 26,
+          "size": 20,
           "id": ""
         }
       ]
     },
     "current_buttons_enabled": true,
     "current_buttons_movable": true,
-    "current_buttons_x": 919,
-    "current_buttons_y": 857
+    "current_buttons_x": 1103,
+    "current_buttons_y": 794,
+    "notes_enabled": true,
+    "notes_movable": true,
+    "notes_x": 40,
+    "notes_y": 120,
+    "notes_heading": "",
+    "notes_rows": []
   },
   "context_layers": {
     "map_open": {
@@ -626,6 +679,14 @@
           "shift",
           "tab"
         ]
+      },
+      "DPAD_LEFT": {
+        "type": "keys",
+        "keys": [
+          "t",
+          "y",
+          "enter"
+        ]
       }
     },
     "mounted": {
@@ -633,12 +694,6 @@
         "type": "keys",
         "keys": [
           "c"
-        ]
-      },
-      "Y": {
-        "type": "keys",
-        "keys": [
-          "v"
         ]
       }
     }

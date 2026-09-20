@@ -15,6 +15,8 @@ from gw2controller.mapping.profiles import load_or_create_default, save_profile
 from gw2controller.output.sendinput import InputSender
 from gw2controller.overlay.current_buttons import CurrentButtonsOverlay
 from gw2controller.overlay.glyphs import app_icon_pixmap
+from gw2controller.overlay.notes import NotesOverlay
+from gw2controller.overlay.panel import PanelOverlay
 from gw2controller.overlay.radial import RadialOverlay
 from gw2controller.overlay.window import OverlayWindow
 from gw2controller.ui.main_window import MainWindow
@@ -41,6 +43,8 @@ class GW2ControllerApp:
         self.sender = InputSender()
         self.overlay = OverlayWindow()
         self.radial = RadialOverlay()
+        self.panel = PanelOverlay()
+        self.notes = NotesOverlay()
         self.current_buttons = CurrentButtonsOverlay()
         self.window = MainWindow(self.profile, self.profile_path)
         self.tray = TrayIcon(self.window)
@@ -61,6 +65,7 @@ class GW2ControllerApp:
         self.window.overlay_layout_selected.connect(self.overlay.set_layout_key)
         self.overlay.slots_changed.connect(self._on_overlay_slots_changed)
         self.current_buttons.moved.connect(self._on_current_buttons_moved)
+        self.notes.moved.connect(self._on_notes_moved)
         self.tray.edit_action.triggered.connect(self.toggle_edit_mode)
         self.tray.hide_overlay_action.triggered.connect(self.toggle_overlay_visible)
         self.app.aboutToQuit.connect(self.shutdown)
@@ -74,6 +79,7 @@ class GW2ControllerApp:
 
         self.overlay.set_profile(self.profile)
         self._apply_current_buttons_config()
+        self._apply_notes_config()
         self.window.show()
         self.app.screenAdded.connect(self.window._refresh_screen_choices)
         self.app.screenRemoved.connect(self.window._refresh_screen_choices)
@@ -119,6 +125,7 @@ class GW2ControllerApp:
         self.reader.trigger_threshold = self.profile.trigger_threshold
         self.overlay.set_profile(self.profile)
         self._apply_current_buttons_config()
+        self._apply_notes_config()
         self._register_hotkeys()
 
     def _apply_current_buttons_config(self) -> None:
@@ -132,9 +139,28 @@ class GW2ControllerApp:
             theme=overlay.theme,
         )
 
+    def _apply_notes_config(self) -> None:
+        overlay = self.profile.overlay
+        self.notes.set_config(
+            enabled=overlay.notes_enabled,
+            movable=overlay.notes_movable,
+            x=overlay.notes_x,
+            y=overlay.notes_y,
+            screen_index=overlay.screen_index,
+            heading=overlay.notes_heading,
+            rows=overlay.active_notes_rows(),
+            theme=overlay.theme,
+            alpha=overlay.radial_alpha,
+        )
+
     def _on_current_buttons_moved(self, x: int, y: int) -> None:
         self.profile.overlay.current_buttons_x = int(x)
         self.profile.overlay.current_buttons_y = int(y)
+        self._overlay_save_timer.start()
+
+    def _on_notes_moved(self, x: int, y: int) -> None:
+        self.profile.overlay.notes_x = int(x)
+        self.profile.overlay.notes_y = int(y)
         self._overlay_save_timer.start()
 
     def _sync_path(self) -> None:
@@ -197,6 +223,12 @@ class GW2ControllerApp:
         self.overlay.set_runtime(result.runtime_label, result.layout_key)
         self.radial.set_view(
             result.radial,
+            self.profile.overlay.screen_index,
+            self.profile.overlay.theme,
+            self.profile.overlay.radial_alpha,
+        )
+        self.panel.set_view(
+            result.panel,
             self.profile.overlay.screen_index,
             self.profile.overlay.theme,
             self.profile.overlay.radial_alpha,

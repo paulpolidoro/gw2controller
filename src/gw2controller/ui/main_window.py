@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSlider,
     QSpinBox,
     QTableWidget,
@@ -34,7 +35,7 @@ from gw2controller.controller.xinput import (
     BUTTON_LABELS,
     PadState,
 )
-from gw2controller.mapping.models import DEFAULT_LAYOUT_KEY, Action, Profile
+from gw2controller.mapping.models import DEFAULT_LAYOUT_KEY, MAX_NOTES_ROWS, Action, NotesRow, Profile
 from gw2controller.mapping.profiles import list_profiles, load_profile, save_profile
 from gw2controller.overlay.glyphs import app_icon_pixmap
 from gw2controller.overlay.window import screen_choices
@@ -91,6 +92,10 @@ class MainWindow(QMainWindow):
         self._overlay_layout = QComboBox()
         self._current_buttons_enabled = QCheckBox("Mostrar botões pressionados")
         self._current_buttons_movable = QCheckBox("Permitir mover esse painel")
+        self._notes_enabled = QCheckBox("Mostrar tabelinha de lembrete")
+        self._notes_movable = QCheckBox("Permitir mover o lembrete")
+        self._notes_heading = QLineEdit()
+        self._notes_table = QTableWidget(0, 2)
         self._long_rumble = QCheckBox("Vibrar ao ativar longo")
 
         self._build()
@@ -176,7 +181,9 @@ class MainWindow(QMainWindow):
             "Ao soltar: dispara uma tecla quando você solta o botão. "
             "Curto / Longo: soltar rápido = curto; segurar = longo. "
             "Modificadora (ex.: LB): enquanto segura, outros botões podem mudar de função "
-            "(configure na aba Mod)."
+            "(configure na aba Mod). "
+            "Painel (tabela): abre um menu que fica na tela; o mesmo botão fecha; "
+            "enquanto aberto, A/B/X/Y… disparam as linhas."
         )
         hint.setWordWrap(True)
         self._table.setColumnCount(4)
@@ -251,6 +258,18 @@ class MainWindow(QMainWindow):
         self._overlay_layout.currentIndexChanged.connect(self._read_overlay_layout)
         self._current_buttons_enabled.toggled.connect(self._read_current_buttons)
         self._current_buttons_movable.toggled.connect(self._read_current_buttons)
+        self._notes_enabled.toggled.connect(self._read_notes)
+        self._notes_movable.toggled.connect(self._read_notes)
+        self._notes_heading.editingFinished.connect(self._read_notes)
+        self._notes_table.setHorizontalHeaderLabels(["Título", "Valor"])
+        self._notes_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._notes_table.verticalHeader().setVisible(False)
+        self._notes_table.setMaximumHeight(180)
+        self._notes_table.itemChanged.connect(self._read_notes)
+        add_note = QPushButton("Adicionar linha")
+        add_note.clicked.connect(self._add_notes_row)
+        clear_note = QPushButton("Limpar vazias")
+        clear_note.clicked.connect(self._clear_empty_notes)
 
         hint = QLabel(
             "A sobreposição fica só na tela escolhida (melhor com dois monitores). "
@@ -303,6 +322,29 @@ class MainWindow(QMainWindow):
         current_hint.setWordWrap(True)
         current_layout.addWidget(current_hint)
 
+        notes_box = QGroupBox("Lembrete (título / valor)")
+        notes_layout = QVBoxLayout(notes_box)
+        notes_layout.addWidget(self._notes_enabled)
+        notes_layout.addWidget(self._notes_movable)
+        heading_row = QHBoxLayout()
+        heading_row.addWidget(QLabel("Cabeçalho"))
+        self._notes_heading.setPlaceholderText("Opcional — ex.: Build HoT")
+        heading_row.addWidget(self._notes_heading, 1)
+        notes_layout.addLayout(heading_row)
+        notes_layout.addWidget(self._notes_table)
+        notes_btns = QHBoxLayout()
+        notes_btns.addWidget(add_note)
+        notes_btns.addWidget(clear_note)
+        notes_btns.addStretch()
+        notes_layout.addLayout(notes_btns)
+        notes_hint = QLabel(
+            "Tabelinha pequena na tela para anotar o que quiser lembrar "
+            "(ex.: “Relíquia” → “Tormento”). Ligue/desligue quando precisar. "
+            "Com “permitir mover”, arraste para o canto que preferir."
+        )
+        notes_hint.setWordWrap(True)
+        notes_layout.addWidget(notes_hint)
+
         layout = QVBoxLayout()
         layout.addWidget(self._overlay_visible)
         layout.addLayout(screen_row)
@@ -312,11 +354,19 @@ class MainWindow(QMainWindow):
         layout.addLayout(alpha_row)
         layout.addLayout(row)
         layout.addWidget(current_box)
+        layout.addWidget(notes_box)
         layout.addWidget(hint)
         layout.addStretch()
-        page = QWidget()
-        page.setLayout(layout)
-        return page
+        content = QWidget()
+        content.setLayout(layout)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(content)
+        return scroll
 
     def _build_options_tab(self) -> QWidget:
         self._long_press.setRange(80, 1200)
@@ -367,6 +417,7 @@ class MainWindow(QMainWindow):
         self._refresh_item_size()
         self._refresh_overlay_layout()
         self._refresh_current_buttons()
+        self._refresh_notes()
         self._map_open_tab.overrides = self.profile.context_layers.map_open
         self._chat_tab.overrides = self.profile.context_layers.chat
         self._mounted_tab.overrides = self.profile.context_layers.mounted
@@ -687,4 +738,69 @@ class MainWindow(QMainWindow):
         self.profile.overlay.current_buttons_enabled = enabled
         self.profile.overlay.current_buttons_movable = self._current_buttons_movable.isChecked()
         self._current_buttons_movable.setEnabled(enabled)
+        self.profile_changed.emit()
+
+    def _refresh_notes(self) -> None:
+        overlay = self.profile.overlay
+        self._notes_enabled.blockSignals(True)
+        self._notes_movable.blockSignals(True)
+        self._notes_heading.blockSignals(True)
+        self._notes_table.blockSignals(True)
+        self._notes_enabled.setChecked(overlay.notes_enabled)
+        self._notes_movable.setChecked(overlay.notes_movable)
+        self._notes_movable.setEnabled(overlay.notes_enabled)
+        self._notes_heading.setEnabled(overlay.notes_enabled)
+        self._notes_table.setEnabled(overlay.notes_enabled)
+        self._notes_heading.setText(overlay.notes_heading)
+        rows = list(overlay.notes_rows)
+        while len(rows) < 1:
+            rows.append(NotesRow())
+        self._notes_table.setRowCount(len(rows))
+        for index, row in enumerate(rows):
+            self._notes_table.setItem(index, 0, QTableWidgetItem(row.title))
+            self._notes_table.setItem(index, 1, QTableWidgetItem(row.value))
+        self._notes_enabled.blockSignals(False)
+        self._notes_movable.blockSignals(False)
+        self._notes_heading.blockSignals(False)
+        self._notes_table.blockSignals(False)
+
+    def _notes_from_table(self) -> list[NotesRow]:
+        rows: list[NotesRow] = []
+        for index in range(self._notes_table.rowCount()):
+            title_item = self._notes_table.item(index, 0)
+            value_item = self._notes_table.item(index, 1)
+            row = NotesRow(
+                title=(title_item.text() if title_item else "").strip(),
+                value=(value_item.text() if value_item else "").strip(),
+            )
+            if row.is_active():
+                rows.append(row)
+        return rows[:MAX_NOTES_ROWS]
+
+    def _read_notes(self) -> None:
+        enabled = self._notes_enabled.isChecked()
+        self.profile.overlay.notes_enabled = enabled
+        self.profile.overlay.notes_movable = self._notes_movable.isChecked()
+        self.profile.overlay.notes_heading = self._notes_heading.text().strip()
+        self.profile.overlay.notes_rows = self._notes_from_table()
+        self._notes_movable.setEnabled(enabled)
+        self._notes_heading.setEnabled(enabled)
+        self._notes_table.setEnabled(enabled)
+        self.profile_changed.emit()
+
+    def _add_notes_row(self) -> None:
+        if self._notes_table.rowCount() >= MAX_NOTES_ROWS:
+            return
+        self._notes_table.blockSignals(True)
+        row = self._notes_table.rowCount()
+        self._notes_table.insertRow(row)
+        self._notes_table.setItem(row, 0, QTableWidgetItem(""))
+        self._notes_table.setItem(row, 1, QTableWidgetItem(""))
+        self._notes_table.blockSignals(False)
+        self._read_notes()
+
+    def _clear_empty_notes(self) -> None:
+        rows = self._notes_from_table()
+        self.profile.overlay.notes_rows = rows
+        self._refresh_notes()
         self.profile_changed.emit()

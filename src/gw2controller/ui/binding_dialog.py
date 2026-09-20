@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from gw2controller.controller.xinput import ALL_BUTTONS, BUTTON_LABELS
-from gw2controller.mapping.models import MAX_RADIAL_ITEMS, Action, RadialItem
+from gw2controller.mapping.models import MAX_PANEL_ITEMS, MAX_RADIAL_ITEMS, Action, RadialItem
 from gw2controller.output.sendinput import (
     key_display_name,
     key_name_from_native_vk,
@@ -217,15 +217,21 @@ class FunctionDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Função do botão")
         self.setModal(True)
-        self.resize(480, 520 if not keys_only else 280)
+        self.resize(520, 640 if not keys_only else 280)
         self._none = QRadioButton("Nenhuma")
         self._keys = QRadioButton("Tecla(s)")
         self._modifier = QRadioButton("Modificadora")
         self._radial = QRadioButton("Menu radial")
+        self._panel = QRadioButton("Painel (tabela)")
         self._keys_editor = KeysEditor()
         self._radial_table = QTableWidget(MAX_RADIAL_ITEMS, 2)
         self._radial_table.setHorizontalHeaderLabels(["Nome", "Teclas (ex.: shift+1)"])
         self._radial_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._panel_title = QLineEdit()
+        self._panel_title.setPlaceholderText("Título do painel (ex.: Montarias)")
+        self._panel_table = QTableWidget(MAX_PANEL_ITEMS, 2)
+        self._panel_table.setHorizontalHeaderLabels(["Nome", "Teclas (ex.: num1)"])
+        self._panel_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._mod_hint = QLabel(
             "Enquanto este botão estiver ativo, os outros botões usam as funções da aba Mod. "
             "Os que você não alterar continuam com a função normal."
@@ -236,6 +242,12 @@ class FunctionDialog(QDialog):
             "Ao soltar, dispara as teclas da opção. Deixe a linha vazia para não usar aquele setor."
         )
         self._radial_hint.setWordWrap(True)
+        self._panel_hint = QLabel(
+            "Abre um menu em tabela (fica aberto). Aperte o mesmo botão de novo para fechar. "
+            "Enquanto aberto, as linhas usam A, B, X, Y… (nesta ordem) e a sobreposição mostra "
+            "botão + nome + tecla. Deixe a linha vazia para ignorar."
+        )
+        self._panel_hint.setWordWrap(True)
 
         form = QFormLayout()
         form.addRow(self._none)
@@ -246,6 +258,10 @@ class FunctionDialog(QDialog):
         form.addRow(self._radial)
         form.addRow(self._radial_hint)
         form.addRow(self._radial_table)
+        form.addRow(self._panel)
+        form.addRow(self._panel_hint)
+        form.addRow("Título", self._panel_title)
+        form.addRow(self._panel_table)
 
         box = QDialogButtonBox()
         ok_btn = box.addButton("OK", QDialogButtonBox.ButtonRole.AcceptRole)
@@ -259,10 +275,20 @@ class FunctionDialog(QDialog):
         self._original = action
         self._keys_only = keys_only
         if keys_only:
-            for widget in (self._modifier, self._mod_hint, self._radial, self._radial_hint, self._radial_table):
+            for widget in (
+                self._modifier,
+                self._mod_hint,
+                self._radial,
+                self._radial_hint,
+                self._radial_table,
+                self._panel,
+                self._panel_hint,
+                self._panel_title,
+                self._panel_table,
+            ):
                 widget.setVisible(False)
         self._load(action)
-        for radio in (self._none, self._keys, self._modifier, self._radial):
+        for radio in (self._none, self._keys, self._modifier, self._radial, self._panel):
             radio.toggled.connect(self._sync_enabled)
         self._sync_enabled()
 
@@ -282,6 +308,16 @@ class FunctionDialog(QDialog):
             for row, item in enumerate(items[:MAX_RADIAL_ITEMS]):
                 self._radial_table.setItem(row, 0, QTableWidgetItem(item.label))
                 self._radial_table.setItem(row, 1, QTableWidgetItem("+".join(item.keys)))
+        elif action.type == "panel":
+            self._panel.setChecked(True)
+            self._keys_editor.set_keys([])
+            self._panel_title.setText(action.title)
+            items = list(action.panel_items)
+            while len(items) < MAX_PANEL_ITEMS:
+                items.append(RadialItem())
+            for row, item in enumerate(items[:MAX_PANEL_ITEMS]):
+                self._panel_table.setItem(row, 0, QTableWidgetItem(item.label))
+                self._panel_table.setItem(row, 1, QTableWidgetItem("+".join(item.keys)))
         else:
             self._none.setChecked(True)
             self._keys_editor.set_keys([])
@@ -292,11 +328,17 @@ class FunctionDialog(QDialog):
         radial = self._radial.isChecked()
         self._radial_table.setEnabled(radial)
         self._radial_hint.setEnabled(radial)
+        panel = self._panel.isChecked()
+        self._panel_table.setEnabled(panel)
+        self._panel_hint.setEnabled(panel)
+        self._panel_title.setEnabled(panel)
 
     def result_action(self) -> Action:
         if self._keys_only and self._modifier.isChecked():
             return Action()
         if self._keys_only and self._radial.isChecked():
+            return Action()
+        if self._keys_only and self._panel.isChecked():
             return Action()
         if self._keys.isChecked():
             return Action(type="keys", keys=self._keys_editor.keys())
@@ -317,6 +359,20 @@ class FunctionDialog(QDialog):
                     )
                 )
             return Action(type="radial", radial_items=items)
+        if self._panel.isChecked():
+            items = []
+            for row in range(MAX_PANEL_ITEMS):
+                name_item = self._panel_table.item(row, 0)
+                keys_item = self._panel_table.item(row, 1)
+                raw = (keys_item.text() if keys_item else "").replace(",", "+")
+                keys = [part.strip().lower() for part in raw.split("+") if part.strip()]
+                items.append(
+                    RadialItem(
+                        label=(name_item.text().strip() if name_item else ""),
+                        keys=keys,
+                    )
+                )
+            return Action(type="panel", title=self._panel_title.text().strip(), panel_items=items)
         return Action()
 
 

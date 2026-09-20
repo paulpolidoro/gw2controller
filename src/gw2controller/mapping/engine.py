@@ -4,9 +4,15 @@ from dataclasses import dataclass, field
 from math import atan2, hypot, tau
 from typing import Literal
 
-from gw2controller.controller.xinput import ALL_BUTTONS, PadState
+from gw2controller.controller.xinput import ALL_BUTTONS, BUTTON_LABELS, PadState
 from gw2controller.gw2.mumble import MumbleState
-from gw2controller.mapping.models import Action, Profile, RadialItem, ordered_keys
+from gw2controller.mapping.models import (
+    PANEL_BIND_ORDER,
+    Action,
+    Profile,
+    RadialItem,
+    ordered_keys,
+)
 
 EventKind = Literal["key_down", "key_up", "mouse_down", "mouse_up", "tap_key", "tap_mouse"]
 
@@ -23,6 +29,15 @@ class RadialView:
     active: bool = False
     items: list[tuple[str, str]] = field(default_factory=list)
     selected: int | None = None
+
+
+@dataclass
+class PanelView:
+    active: bool = False
+    title: str = ""
+    items: list[tuple[str, str, str]] = field(default_factory=list)  # botão, nome, teclas
+    owner: str = ""
+    pressed: str | None = None
 
 
 @dataclass
@@ -46,6 +61,7 @@ class TickResult:
     layout_key: str = "default"
     pressed_frames: list[PressedFrame] = field(default_factory=list)
     long_triggered: bool = False
+    panel: PanelView = field(default_factory=PanelView)
 
 
 def apply_radial_deadzone(x: float, y: float, deadzone: float) -> tuple[float, float]:
@@ -77,6 +93,12 @@ class MappingEngine:
         self._radial_button: str | None = None
         self._radial_items: list[RadialItem] = []
         self._radial_selected: int | None = None
+        self._panel_button: str | None = None
+        self._panel_title: str = ""
+        self._panel_items: list[RadialItem] = []
+        self._panel_binds: dict[str, RadialItem] = {}
+        self._panel_pressed: str | None = None
+        self._panel_consume_release: set[str] = set()
         self._was_connected = False
         self._mumble = MumbleState()
         self._input_blocked = False
@@ -88,6 +110,7 @@ class MappingEngine:
         self._long_armed.clear()
         self._scheduled.clear()
         self._close_radial()
+        self._close_panel()
         return events
 
     def set_mumble(self, state: MumbleState) -> list[InputEvent]:
@@ -98,6 +121,7 @@ class MappingEngine:
             events = self.release_held()
             self._scheduled.clear()
             self._close_radial()
+            self._close_panel()
             return events
         return []
 
@@ -109,6 +133,7 @@ class MappingEngine:
             events.append(InputEvent("key_up", key=key))
         self._move_held.clear()
         self._chords.clear()
+        self._close_panel()
         return events
 
     def tick(self, pad: PadState, now_s: float, dt_s: float) -> TickResult:
@@ -150,6 +175,7 @@ class MappingEngine:
                 events.extend(self.release_held())
                 self._scheduled.clear()
                 self._close_radial()
+                self._close_panel()
             self._prev_buttons = {name: bool(pad.buttons.get(name)) for name in ALL_BUTTONS}
             return TickResult(
                 runtime_label=self._runtime_label(),
@@ -162,6 +188,7 @@ class MappingEngine:
                 mumble=self._mumble,
                 layout_key=self._layout_key(),
                 pressed_frames=self._pressed_frames(pad, now_s),
+                panel=self._panel_view(),
             )
 
         threshold = max(0.08, self.profile.long_press_ms / 1000.0)
@@ -203,20 +230,33 @@ class MappingEngine:
             layout_key=self._layout_key(),
             pressed_frames=self._pressed_frames(pad, now_s),
             long_triggered=long_triggered,
+            panel=self._panel_view(pad),
         )
 
     def _on_press(self, button: str, now_s: float) -> list[InputEvent]:
+        if self._panel_button == button:
+            self._close_panel()
+            self._panel_consume_release.add(button)
+            return []
+        if self._panel_button and button in self._panel_binds:
+            self._panel_pressed = button
+            return self._tap_keys(self._panel_binds[button].keys, now_s)
+
         override = self._override_for(button)
         if override is not None:
             return self._activate(button, override)
         mapping = self.profile.button_map(button)
         if mapping.mode == "press":
             return self._activate(button, mapping.press)
-        if mapping.short.type in ("modifier", "radial"):
+        if mapping.short.type in ("modifier", "radial", "panel"):
             return self._activate(button, mapping.short)
         return []
 
     def _on_hold(self, button: str, now_s: float, threshold: float) -> tuple[list[InputEvent], bool]:
+        if self._panel_button and button in self._panel_binds:
+            return [], False
+        if self._panel_button == button:
+            return [], False
         mapping = self.profile.button_map(button)
         if mapping.mode != "short_long" or button in self._long_armed:
             return [], False
@@ -231,16 +271,22 @@ class MappingEngine:
         if current is not None:
             events.extend(self._deactivate(button, fire_radial=False))
         events.extend(self._activate(button, mapping.long))
-        # Vibra mesmo se o longo estiver vazio — confirma que o limiar foi atingido.
         return events, True
 
     def _on_release(self, button: str, now_s: float, threshold: float) -> list[InputEvent]:
+        if self._panel_pressed == button:
+            self._panel_pressed = None
         mapping = self.profile.button_map(button)
         started = self._down_since.pop(button, now_s)
         long_armed = button in self._long_armed
         self._long_armed.discard(button)
         override = self._override_for(button)
         events: list[InputEvent] = []
+        if button in self._panel_consume_release:
+            self._panel_consume_release.discard(button)
+            if button in self._active:
+                events.extend(self._deactivate(button, fire_radial=False, now_s=now_s))
+            return events
         if button in self._active:
             events.extend(self._deactivate(button, fire_radial=True, now_s=now_s))
         elif (
@@ -250,6 +296,7 @@ class MappingEngine:
             and now_s - started < threshold
             and mapping.short.type == "keys"
             and mapping.short.is_active()
+            and not (self._panel_button and button in self._panel_binds)
         ):
             events.extend(self._tap_keys(mapping.short.chord(), now_s))
         if (
@@ -257,12 +304,20 @@ class MappingEngine:
             and mapping.mode == "press"
             and mapping.release.type == "keys"
             and mapping.release.is_active()
+            and not (self._panel_button and button in self._panel_binds)
         ):
             events.extend(self._tap_keys(mapping.release.chord(), now_s))
         return events
 
     def _activate(self, button: str, action: Action) -> list[InputEvent]:
         if action.type == "none" or (action.type != "modifier" and not action.is_active()):
+            return []
+        if action.type == "panel":
+            if self._panel_button == button:
+                self._close_panel()
+                self._panel_consume_release.add(button)
+                return []
+            self._open_panel(button, action)
             return []
         self._active[button] = action
         events: list[InputEvent] = []
@@ -297,9 +352,16 @@ class MappingEngine:
         for button in ALL_BUTTONS:
             if not pad.buttons.get(button):
                 continue
+            if self._panel_button and button in self._panel_binds:
+                continue
+            if self._panel_button == button:
+                continue
             if button in self._mod_order:
                 continue
             desired = self._intended_action(button, pad)
+            if desired.type == "panel":
+                # Painel é sticky (abre/fecha só no edge), não no resync.
+                continue
             current = self._active.get(button)
             if _same_action(current, desired):
                 continue
@@ -317,7 +379,7 @@ class MappingEngine:
             return mapping.press
         if button in self._long_armed:
             return mapping.long
-        if mapping.short.type in ("modifier", "radial"):
+        if mapping.short.type in ("modifier", "radial", "panel"):
             return mapping.short
         return Action()
 
@@ -402,6 +464,57 @@ class MappingEngine:
         items = [(item.display_label(), keys_label_safe(item.keys)) for item in self._radial_items]
         return RadialView(True, items, self._radial_selected)
 
+    def _open_panel(self, button: str, action: Action) -> None:
+        items = action.active_panel_items()
+        if not items:
+            return
+        if self._panel_button and self._panel_button != button:
+            self._close_panel()
+        binds: dict[str, RadialItem] = {}
+        for pad_button, item in zip(
+            (name for name in PANEL_BIND_ORDER if name != button),
+            items,
+            strict=False,
+        ):
+            binds[pad_button] = item
+        self._panel_button = button
+        self._panel_title = action.title.strip() or "Painel"
+        self._panel_items = items
+        self._panel_binds = binds
+        self._panel_pressed = None
+
+    def _close_panel(self) -> None:
+        self._panel_button = None
+        self._panel_title = ""
+        self._panel_items = []
+        self._panel_binds = {}
+        self._panel_pressed = None
+
+    def _panel_view(self, pad: PadState | None = None) -> PanelView:
+        if not self._panel_button:
+            return PanelView()
+        from gw2controller.overlay.slot import overlay_button_label
+
+        items: list[tuple[str, str, str]] = []
+        for pad_button, item in self._panel_binds.items():
+            items.append(
+                (
+                    overlay_button_label(pad_button),
+                    item.display_label(),
+                    keys_label_safe(item.keys),
+                )
+            )
+        pressed = self._panel_pressed
+        if pad is not None and pressed and not pad.buttons.get(pressed):
+            pressed = None
+        return PanelView(
+            active=True,
+            title=self._panel_title,
+            items=items,
+            owner=BUTTON_LABELS.get(self._panel_button, self._panel_button),
+            pressed=overlay_button_label(pressed) if pressed else None,
+        )
+
     def _layout_key(self) -> str:
         if not self._mod_order:
             return "default"
@@ -460,18 +573,20 @@ class MappingEngine:
             return 1.0, False
         if button in self._long_armed:
             return 1.0, False
-        if mapping.short.type in ("modifier", "radial"):
+        if mapping.short.type in ("modifier", "radial", "panel"):
             return 1.0, False
         started = self._down_since.get(button, now_s)
         progress = min(1.0, max(0.0, (now_s - started) / threshold))
         return progress, True
 
     def _runtime_label(self) -> str:
-        from gw2controller.controller.xinput import BUTTON_LABELS
+        from gw2controller.controller.xinput import BUTTON_LABELS as labels
 
         parts: list[str] = []
+        if self._panel_button:
+            parts.append(f"Painel {labels.get(self._panel_button, self._panel_button)}")
         if self._mod_order:
-            parts.append("+".join(BUTTON_LABELS.get(name, name) for name in self._mod_order))
+            parts.append("+".join(labels.get(name, name) for name in self._mod_order))
         if self._mumble.map_open:
             parts.append("Mapa")
         if self._mumble.textbox_focused:
@@ -485,6 +600,9 @@ class MappingEngine:
     def _captions(self) -> dict[str, str]:
         captions: dict[str, str] = {}
         for button in ALL_BUTTONS:
+            if self._panel_button and button in self._panel_binds:
+                captions[button] = self._panel_binds[button].display_label()
+                continue
             override = self._override_for(button)
             if override is not None:
                 captions[button] = override.label()
@@ -558,6 +676,11 @@ def _same_action(current: Action | None, desired: Action) -> bool:
         return current is desired or current.overrides == desired.overrides
     if current.type == "radial":
         return current.active_radial_items() == desired.active_radial_items()
+    if current.type == "panel":
+        return (
+            current.title.strip() == desired.title.strip()
+            and current.active_panel_items() == desired.active_panel_items()
+        )
     return True
 
 

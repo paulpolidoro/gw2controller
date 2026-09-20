@@ -105,6 +105,62 @@ QCheckBox, QLabel, QRadioButton {
     background: transparent;
     color: #1F2937;
 }
+QRadioButton {
+    spacing: 8px;
+}
+QRadioButton::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 9px;
+    border: 2px solid #94A3B8;
+    background: #FFFFFF;
+}
+QRadioButton::indicator:hover {
+    border-color: #2563EB;
+}
+QRadioButton::indicator:checked {
+    border: 2px solid #2563EB;
+    background: qradialgradient(
+        cx: 0.5, cy: 0.5, radius: 0.5,
+        fx: 0.5, fy: 0.5,
+        stop: 0 #FFFFFF,
+        stop: 0.35 #FFFFFF,
+        stop: 0.45 #2563EB,
+        stop: 1 #2563EB
+    );
+}
+QRadioButton::indicator:disabled {
+    border-color: #CBD5E1;
+    background: #F1F5F9;
+}
+QCheckBox {
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 2px solid #94A3B8;
+    background: #FFFFFF;
+}
+QCheckBox::indicator:hover {
+    border-color: #2563EB;
+}
+QCheckBox::indicator:checked {
+    border: 2px solid #1D4ED8;
+    background: #2563EB;
+}
+QCheckBox::indicator:checked:hover {
+    background: #1D4ED8;
+}
+QCheckBox::indicator:disabled {
+    border-color: #CBD5E1;
+    background: #F1F5F9;
+}
+QCheckBox::indicator:checked:disabled {
+    border-color: #93C5FD;
+    background: #93C5FD;
+}
 QSlider::groove:horizontal {
     height: 6px;
     background: #D5DCE6;

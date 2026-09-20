@@ -4,10 +4,27 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 PressMode = Literal["press", "short_long"]
-ActionType = Literal["none", "keys", "modifier", "radial"]
+ActionType = Literal["none", "keys", "modifier", "radial", "panel"]
 StickMode = Literal["wasd", "arrows", "mouse", "off"]
 MAX_RADIAL_ITEMS = 8
+MAX_PANEL_ITEMS = 8
 MOUSE_KEY_PREFIX = "mouse_"
+
+# Ordem em que as linhas do painel ocupam botões enquanto o menu está aberto.
+PANEL_BIND_ORDER = [
+    "A",
+    "B",
+    "X",
+    "Y",
+    "LB",
+    "RB",
+    "LT",
+    "RT",
+    "DPAD_UP",
+    "DPAD_DOWN",
+    "DPAD_LEFT",
+    "DPAD_RIGHT",
+]
 
 MODIFIER_KEY_ORDER = ("shift", "ctrl", "alt", "lshift", "rshift", "lctrl", "rctrl", "lalt", "ralt", "win")
 
@@ -67,6 +84,8 @@ class Action:
     keys: list[str] = field(default_factory=list)
     overrides: dict[str, Action] = field(default_factory=dict)
     radial_items: list[RadialItem] = field(default_factory=list)
+    panel_items: list[RadialItem] = field(default_factory=list)
+    title: str = ""
 
     def is_active(self) -> bool:
         if self.type == "keys":
@@ -75,6 +94,8 @@ class Action:
             return True
         if self.type == "radial":
             return any(item.is_active() for item in self.radial_items)
+        if self.type == "panel":
+            return any(item.is_active() for item in self.panel_items)
         return False
 
     def chord(self) -> list[str]:
@@ -82,6 +103,9 @@ class Action:
 
     def active_radial_items(self) -> list[RadialItem]:
         return [item for item in self.radial_items[:MAX_RADIAL_ITEMS] if item.is_active()]
+
+    def active_panel_items(self) -> list[RadialItem]:
+        return [item for item in self.panel_items[:MAX_PANEL_ITEMS] if item.is_active()]
 
     def label(self) -> str:
         if self.type == "keys":
@@ -91,6 +115,9 @@ class Action:
             return f"Modificadora ({count})"
         if self.type == "radial":
             return f"Menu radial ({len(self.active_radial_items())})"
+        if self.type == "panel":
+            title = self.title.strip() or "Painel"
+            return f"{title} ({len(self.active_panel_items())})"
         return "—"
 
     @classmethod
@@ -98,7 +125,9 @@ class Action:
         if not data:
             return cls()
         raw = str(data.get("type") or "none")
-        action_type: ActionType = raw if raw in ("keys", "modifier", "radial") else "none"  # type: ignore[assignment]
+        action_type: ActionType = (
+            raw if raw in ("keys", "modifier", "radial", "panel") else "none"
+        )  # type: ignore[assignment]
         keys = data.get("keys") or []
         if isinstance(keys, str):
             keys = [keys]
@@ -106,10 +135,23 @@ class Action:
             str(button): Action.from_dict(payload)
             for button, payload in dict(data.get("overrides") or {}).items()
         }
-        items = [RadialItem.from_dict(item) for item in list(data.get("radial_items") or [])[:MAX_RADIAL_ITEMS]]
-        while len(items) < MAX_RADIAL_ITEMS and action_type == "radial":
-            items.append(RadialItem())
-        return cls(type=action_type, keys=[str(k) for k in keys], overrides=overrides, radial_items=items)
+        radial_items = [
+            RadialItem.from_dict(item) for item in list(data.get("radial_items") or [])[:MAX_RADIAL_ITEMS]
+        ]
+        while len(radial_items) < MAX_RADIAL_ITEMS and action_type == "radial":
+            radial_items.append(RadialItem())
+        panel_src = data.get("panel_items") or data.get("menu_items") or []
+        panel_items = [RadialItem.from_dict(item) for item in list(panel_src)[:MAX_PANEL_ITEMS]]
+        while len(panel_items) < MAX_PANEL_ITEMS and action_type == "panel":
+            panel_items.append(RadialItem())
+        return cls(
+            type=action_type,
+            keys=[str(k) for k in keys],
+            overrides=overrides,
+            radial_items=radial_items,
+            panel_items=panel_items,
+            title=str(data.get("title") or ""),
+        )
 
     def to_dict(self) -> dict[str, Any]:
         if self.type == "none" or (self.type != "modifier" and not self.is_active()):
@@ -125,6 +167,10 @@ class Action:
             }
         elif self.type == "radial":
             payload["radial_items"] = [item.to_dict() for item in self.radial_items[:MAX_RADIAL_ITEMS]]
+        elif self.type == "panel":
+            if self.title.strip():
+                payload["title"] = self.title.strip()
+            payload["panel_items"] = [item.to_dict() for item in self.panel_items[:MAX_PANEL_ITEMS]]
         return payload
 
 
@@ -259,6 +305,24 @@ def _slots_from_list(items: list[Any] | None) -> list[OverlaySlot]:
 
 
 DEFAULT_LAYOUT_KEY = "default"
+MAX_NOTES_ROWS = 12
+
+
+@dataclass
+class NotesRow:
+    title: str = ""
+    value: str = ""
+
+    def is_active(self) -> bool:
+        return bool(self.title.strip() or self.value.strip())
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> NotesRow:
+        data = data or {}
+        return cls(title=str(data.get("title") or ""), value=str(data.get("value") or ""))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"title": self.title.strip(), "value": self.value.strip()}
 
 
 @dataclass
@@ -274,6 +338,15 @@ class OverlayConfig:
     current_buttons_movable: bool = False
     current_buttons_x: int = 40
     current_buttons_y: int = 40
+    notes_enabled: bool = False
+    notes_movable: bool = True
+    notes_x: int = 40
+    notes_y: int = 120
+    notes_heading: str = ""
+    notes_rows: list[NotesRow] = field(default_factory=list)
+
+    def active_notes_rows(self) -> list[NotesRow]:
+        return [row for row in self.notes_rows[:MAX_NOTES_ROWS] if row.is_active()]
 
     def layout_keys(self) -> list[str]:
         keys = [DEFAULT_LAYOUT_KEY]
@@ -330,6 +403,10 @@ class OverlayConfig:
             if not key or key == DEFAULT_LAYOUT_KEY:
                 continue
             layouts[key] = _slots_from_list(items)
+        notes_rows = [
+            NotesRow.from_dict(item)
+            for item in list(data.get("notes_rows") or [])[:MAX_NOTES_ROWS]
+        ]
         return cls(
             visible=bool(data.get("visible", True)),
             screen_index=int(data.get("screen_index", -1)),
@@ -342,6 +419,12 @@ class OverlayConfig:
             current_buttons_movable=bool(data.get("current_buttons_movable", False)),
             current_buttons_x=int(data.get("current_buttons_x", 40)),
             current_buttons_y=int(data.get("current_buttons_y", 40)),
+            notes_enabled=bool(data.get("notes_enabled", False)),
+            notes_movable=bool(data.get("notes_movable", True)),
+            notes_x=int(data.get("notes_x", 40)),
+            notes_y=int(data.get("notes_y", 120)),
+            notes_heading=str(data.get("notes_heading") or ""),
+            notes_rows=notes_rows,
         )
 
 
@@ -459,6 +542,12 @@ class Profile:
                 "current_buttons_movable": self.overlay.current_buttons_movable,
                 "current_buttons_x": self.overlay.current_buttons_x,
                 "current_buttons_y": self.overlay.current_buttons_y,
+                "notes_enabled": self.overlay.notes_enabled,
+                "notes_movable": self.overlay.notes_movable,
+                "notes_x": self.overlay.notes_x,
+                "notes_y": self.overlay.notes_y,
+                "notes_heading": self.overlay.notes_heading,
+                "notes_rows": [row.to_dict() for row in self.overlay.notes_rows if row.is_active()],
             },
             "context_layers": self.context_layers.to_dict(),
         }
